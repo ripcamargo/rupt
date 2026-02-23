@@ -10,6 +10,15 @@ function TaskItem({
   onComplete,
   onToggleUrgent,
   onReopen,
+  isEditMode,
+  onDelete,
+  isDragging,
+  isDragOver,
+  onDragStart,
+  onDragOver,
+  onDragLeave,
+  onDrop,
+  onDragEnd,
 }) {
   const totalSeconds = task.totalDurationSeconds + (isRunning ? elapsedSeconds : 0);
 
@@ -19,7 +28,29 @@ function TaskItem({
   });
 
   return (
-    <div className={`task-item ${task.status} ${isRunning ? 'running' : ''} ${task.isUrgent ? 'urgent' : ''}`}>
+    <div 
+      className={`task-item ${task.status} ${isRunning ? 'running' : ''} ${task.isUrgent ? 'urgent' : ''} ${isDragging ? 'dragging' : ''} ${isDragOver ? 'drag-over' : ''}`}
+      draggable={!isRunning}
+      onDragStart={onDragStart}
+      onDragOver={onDragOver}
+      onDragLeave={onDragLeave}
+      onDrop={onDrop}
+      onDragEnd={onDragEnd}
+    >
+      {!isRunning && (
+        <div className="drag-handle" title="Arrastar para reordenar">
+          ⋮⋮
+        </div>
+      )}
+      {isEditMode && (
+        <button
+          className="btn-delete-task"
+          onClick={onDelete}
+          title="Excluir registro"
+        >
+          −
+        </button>
+      )}
       <div className="task-content">
         <div className="task-info">
           <div className="task-description">

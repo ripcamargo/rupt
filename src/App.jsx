@@ -175,6 +175,21 @@ function App() {
     );
   };
 
+  const deleteTask = (taskId) => {
+    setTasks((prevTasks) => prevTasks.filter((task) => task.id !== taskId));
+    if (runningTaskId === taskId) {
+      setRunningTaskId(null);
+    }
+  };
+
+  const reorderTasks = (reorderedTasks) => {
+    // Update the tasks array with the new order
+    // Keep tasks from other days unchanged
+    const reorderedIds = reorderedTasks.map(t => t.id);
+    const otherTasks = tasks.filter(t => !reorderedIds.includes(t.id));
+    setTasks([...reorderedTasks, ...otherTasks]);
+  };
+
   const handleSaveSettings = (newSettings) => {
     setSettings(newSettings);
     saveSettings(newSettings);
@@ -262,6 +277,8 @@ function App() {
                 onComplete={completeTask}
                 onToggleUrgent={toggleUrgent}
                 onReopen={reopenTask}
+                onDelete={deleteTask}
+                onReorderTasks={reorderTasks}
               />
             ))
           )}

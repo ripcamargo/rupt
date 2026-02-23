@@ -14,8 +14,13 @@ function DayGroup({
   onComplete,
   onToggleUrgent,
   onReopen,
+  onDelete,
+  onReorderTasks,
 }) {
   const [isExpanded, setIsExpanded] = useState(isToday(tasks[0].createdAt));
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [draggedTaskId, setDraggedTaskId] = useState(null);
+  const [dragOverTaskId, setDragOverTaskId] = useState(null);
 
   // Calculate total time for the day
   const dayTotal = tasks.reduce(
@@ -40,6 +45,49 @@ function DayGroup({
     downloadLog(tasks, tasks[0].createdAt);
   };
 
+  const handleToggleEditMode = (e) => {
+    e.stopPropagation();
+    setIsEditMode(!isEditMode);
+  };
+
+  const handleDragStart = (taskId) => {
+    setDraggedTaskId(taskId);
+  };
+
+  const handleDragOver = (e, taskId) => {
+    e.preventDefault();
+    if (draggedTaskId && draggedTaskId !== taskId) {
+      setDragOverTaskId(taskId);
+    }
+  };
+
+  const handleDragLeave = () => {
+    setDragOverTaskId(null);
+  };
+
+  const handleDrop = (e, targetTaskId) => {
+    e.preventDefault();
+    if (draggedTaskId && draggedTaskId !== targetTaskId) {
+      const draggedIndex = sortedTasks.findIndex((t) => t.id === draggedTaskId);
+      const targetIndex = sortedTasks.findIndex((t) => t.id === targetTaskId);
+      
+      if (draggedIndex !== -1 && targetIndex !== -1) {
+        const newOrder = [...sortedTasks];
+        const [draggedTask] = newOrder.splice(draggedIndex, 1);
+        newOrder.splice(targetIndex, 0, draggedTask);
+        
+        onReorderTasks(newOrder);
+      }
+    }
+    setDraggedTaskId(null);
+    setDragOverTaskId(null);
+  };
+
+  const handleDragEnd = () => {
+    setDraggedTaskId(null);
+    setDragOverTaskId(null);
+  };
+
   return (
     <div className="day-group">
       <button
@@ -53,6 +101,13 @@ function DayGroup({
           </span>
           <div className="day-header-actions">
             <span className="day-total">{formatTime(dayTotal)}</span>
+            <button
+              className={`btn-edit-mode ${isEditMode ? 'active' : ''}`}
+              onClick={handleToggleEditMode}
+              title="Editar registros do dia"
+            >
+              ✏️
+            </button>
             <button
               className="btn-download-log"
               onClick={handleDownloadLog}
@@ -80,6 +135,15 @@ function DayGroup({
               onComplete={() => onComplete(task.id)}
               onToggleUrgent={() => onToggleUrgent(task.id)}
               onReopen={() => onReopen(task.id)}
+              isEditMode={isEditMode}
+              onDelete={() => onDelete(task.id)}
+              isDragging={draggedTaskId === task.id}
+              isDragOver={dragOverTaskId === task.id}
+              onDragStart={() => handleDragStart(task.id)}
+              onDragOver={(e) => handleDragOver(e, task.id)}
+              onDragLeave={handleDragLeave}
+              onDrop={(e) => handleDrop(e, task.id)}
+              onDragEnd={handleDragEnd}
             />
           ))}
         </div>

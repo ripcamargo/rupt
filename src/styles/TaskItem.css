@@ -8,6 +8,25 @@
   border-radius: 6px;
   margin-bottom: 0.75rem;
   transition: all 0.3s ease;
+  position: relative;
+  cursor: grab;
+}
+
+.task-item:active {
+  cursor: grabbing;
+}
+
+.task-item.dragging {
+  opacity: 0.5;
+  transform: scale(0.95);
+  cursor: grabbing;
+}
+
+.task-item.drag-over {
+  border-color: #4adeb9;
+  background-color: #1a2a1a;
+  transform: translateY(-4px);
+  box-shadow: 0 4px 12px rgba(74, 222, 185, 0.3);
 }
 
 .task-item:hover {
@@ -18,6 +37,11 @@
   border-color: #4adeb9;
   background-color: #1a2a1a;
   box-shadow: 0 0 10px rgba(74, 222, 185, 0.2);
+  cursor: default;
+}
+
+.task-item.running:active {
+  cursor: default;
 }
 
 .task-item.urgent {
@@ -42,6 +66,7 @@
   justify-content: space-between;
   align-items: center;
   gap: 2rem;
+  margin-left: 1.5rem;
 }
 
 .task-info {
@@ -192,6 +217,57 @@
   border-radius: 4px;
   font-size: 0.8rem;
   font-weight: 500;
+}
+
+.btn-delete-task {
+  position: absolute;
+  left: -10px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background-color: #d93f3f;
+  color: #fff;
+  border: 2px solid #1a1a1a;
+  font-size: 1.2rem;
+  font-weight: bold;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  z-index: 10;
+  line-height: 1;
+  padding: 0;
+}
+
+.btn-delete-task:hover {
+  background-color: #ef4444;
+  transform: translateY(-50%) scale(1.15);
+  box-shadow: 0 0 10px rgba(217, 63, 63, 0.5);
+}
+
+.drag-handle {
+  position: absolute;
+  left: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #666;
+  font-size: 1rem;
+  cursor: grab;
+  user-select: none;
+  padding: 0.25rem;
+  opacity: 0.6;
+  transition: opacity 0.2s ease;
+}
+
+.task-item:hover .drag-handle {
+  opacity: 1;
+}
+
+.task-item.dragging .drag-handle {
+  cursor: grabbing;
 }
 
 @media (max-width: 768px) {
