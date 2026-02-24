@@ -22,6 +22,8 @@ function App() {
   const inputRef = useRef(null);
   const lastNotificationRef = useRef({});
   const workHoursNotifiedRef = useRef({ lunch: null, exit: null }); // Track if already notified today
+  const timerStartRef = useRef(null); // Track when timer started for timestamp-based counting
+  const timerBaseDurationRef = useRef(0); // Track base duration when timer starts
 
   // Load tasks from storage on mount
   useEffect(() => {
@@ -34,25 +36,41 @@ function App() {
     saveTasks(tasks);
   }, [tasks]);
 
-  // Update timer for running task
+  // Update timer for running task using timestamp-based approach
   useEffect(() => {
-    if (!runningTaskId) return;
+    if (!runningTaskId) {
+      timerStartRef.current = null;
+      return;
+    }
+
+    // Store the start timestamp
+    timerStartRef.current = Date.now();
 
     const interval = setInterval(() => {
-      setTasks((prevTasks) =>
-        prevTasks.map((task) => {
-          if (task.id === runningTaskId && task.status === 'running') {
-            return {
-              ...task,
-              totalDurationSeconds: task.totalDurationSeconds + 1,
-            };
-          }
-          return task;
-        })
-      );
+      if (timerStartRef.current) {
+        // Calculate elapsed time based on real timestamps
+        const currentTime = Date.now();
+        const realElapsedMs = currentTime - timerStartRef.current;
+        const realElapsedSeconds = Math.floor(realElapsedMs / 1000);
+        
+        setTasks((prevTasks) =>
+          prevTasks.map((task) => {
+            if (task.id === runningTaskId && task.status === 'running') {
+              return {
+                ...task,
+                totalDurationSeconds: timerBaseDurationRef.current + realElapsedSeconds,
+              };
+            }
+            return task;
+          })
+        );
+      }
     }, 1000);
 
-    return () => clearInterval(interval);
+    return () => {
+      clearInterval(interval);
+      timerStartRef.current = null;
+    };
   }, [runningTaskId]);
 
   // Auto-focus input on mount
@@ -226,6 +244,7 @@ function App() {
       totalDurationSeconds: 0,
       status: 'running',
       isUrgent: false,
+      customOrderDate: null, // Tracks when manual ordering started for this day
     };
 
     // Pause current running task
@@ -241,6 +260,7 @@ function App() {
 
     setTasks((prevTasks) => [newTask, ...prevTasks]);
     setRunningTaskId(newTask.id);
+    timerBaseDurationRef.current = 0; // New task starts at 0
     setInput('');
     setStep('description');
     setTempDescription('');
@@ -248,6 +268,12 @@ function App() {
   };
 
   const startTask = (taskId) => {
+    // Find the task to get its current duration
+    const taskToStart = tasks.find(t => t.id === taskId);
+    if (taskToStart) {
+      timerBaseDurationRef.current = taskToStart.totalDurationSeconds;
+    }
+
     // Pause current running task
     if (runningTaskId && runningTaskId !== taskId) {
       setTasks((prevTasks) =>
@@ -259,7 +285,7 @@ function App() {
       );
     }
 
-    // Start the new task
+    // Start the new task - reset customOrderDate to make it float to top automatically
     setTasks((prevTasks) =>
       prevTasks.map((task) =>
         task.id === taskId
@@ -267,6 +293,7 @@ function App() {
               ...task,
               status: 'running',
               startedAt: new Date().toISOString(),
+              customOrderDate: null, // Reset to ignore manual ordering, float to top
             }
           : task
       )
@@ -282,6 +309,7 @@ function App() {
       )
     );
     setRunningTaskId(null);
+    timerBaseDurationRef.current = 0;
     // Clear notification reference when task pauses
     delete lastNotificationRef.current[taskId];
   };
@@ -309,6 +337,7 @@ function App() {
     );
     if (runningTaskId === taskId) {
       setRunningTaskId(null);
+      timerBaseDurationRef.current = 0;
     }
     // Clear notification reference when task completes
     delete lastNotificationRef.current[taskId];
@@ -318,7 +347,11 @@ function App() {
     setTasks((prevTasks) =>
       prevTasks.map((task) =>
         task.id === taskId
-          ? { ...task, isUrgent: !task.isUrgent }
+          ? { 
+              ...task, 
+              isUrgent: !task.isUrgent,
+              customOrderDate: null, // Reset to ignore manual ordering, float based on urgency
+            }
           : task
       )
     );
@@ -381,24 +414,34 @@ function App() {
   };
 
   const reorderTasks = (reorderedTasks) => {
-    // Create a map for quick lookup of reordered tasks and their new positions
-    const reorderedMap = new Map(reorderedTasks.map((task, index) => [task.id, { task, newIndex: index }]));
+    // Get the date from the first task in the reordered group
+    const dateOfReorderedTasks = reorderedTasks.length > 0 
+      ? new Date(reorderedTasks[0].createdAt).toLocaleDateString('pt-BR')
+      : null;
     
-    // Find all indices of reordered tasks in the original array
-    const reorderedIndices = [];
-    tasks.forEach((task, index) => {
-      if (reorderedMap.has(task.id)) {
-        reorderedIndices.push(index);
+    // Mark ALL tasks from this day as having custom order
+    // This locks the entire day into manual ordering mode
+    const result = tasks.map((task) => {
+      const taskDate = new Date(task.createdAt).toLocaleDateString('pt-BR');
+      
+      // If this task is part of the reordered group, update it from the reordered list
+      const reorderedTask = reorderedTasks.find(t => t.id === task.id);
+      
+      if (reorderedTask && taskDate === dateOfReorderedTasks) {
+        // This is a reordered task - use the new version and mark it
+        return {
+          ...reorderedTask,
+          customOrderDate: dateOfReorderedTasks,
+        };
+      } else if (taskDate === dateOfReorderedTasks) {
+        // This task is from the same day but wasn't reordered - just mark it
+        return {
+          ...task,
+          customOrderDate: dateOfReorderedTasks,
+        };
       }
-    });
-    
-    // Build new array: replace reordered tasks at their original positions
-    const result = tasks.map((task, index) => {
-      if (reorderedMap.has(task.id)) {
-        // Find which position this index corresponds to in the reordered group
-        const positionInGroup = reorderedIndices.indexOf(index);
-        return reorderedTasks[positionInGroup];
-      }
+      
+      // Different day - don't change
       return task;
     });
     
@@ -418,7 +461,45 @@ function App() {
 
   // Group tasks by date
   const groupedTasks = groupTasksByDate(tasks);
-  const dateKeys = Object.keys(groupedTasks);
+  
+  // Sort tasks within each day with smart ordering
+  const sortedGroupedTasks = Object.keys(groupedTasks).reduce((acc, dateKey) => {
+    const tasksForDate = groupedTasks[dateKey];
+    
+    // Separate completed from active tasks
+    const activeTasks = tasksForDate.filter(task => task.status !== 'completed');
+    const completedTasks = tasksForDate.filter(task => task.status === 'completed');
+    
+    // Separate auto-ordered and manually-ordered tasks
+    const autoOrderedTasks = activeTasks.filter(task => task.customOrderDate === null);
+    const manualOrderedTasks = activeTasks.filter(task => task.customOrderDate !== null);
+    
+    // Sort auto-ordered tasks
+    const sortedAutoTasks = [...autoOrderedTasks].sort((a, b) => {
+      // First by status - running first, then paused
+      const statusOrder = { 'paused': 0, 'running': 1 };
+      const statusA = statusOrder[a.status] || 0;
+      const statusB = statusOrder[b.status] || 0;
+      
+      if (statusA !== statusB) {
+        return statusB - statusA; // Higher status value = higher priority = comes first
+      }
+      
+      // Same status - urgent at top
+      if (a.isUrgent !== b.isUrgent) {
+        return a.isUrgent ? -1 : 1;
+      }
+      
+      return 0;
+    });
+    
+    // Combine: auto-ordered tasks (with proper sorting) first, then manually-ordered tasks, then completed
+    acc[dateKey] = [...sortedAutoTasks, ...manualOrderedTasks, ...completedTasks];
+    
+    return acc;
+  }, {});
+  
+  const dateKeys = Object.keys(sortedGroupedTasks);
 
   return (
     <div className="app-container">
@@ -510,7 +591,7 @@ function App() {
               <DayGroup
                 key={dateKey}
                 dateKey={dateKey}
-                tasks={groupedTasks[dateKey]}
+                tasks={sortedGroupedTasks[dateKey]}
                 runningTaskId={runningTaskId}
                 onStart={startTask}
                 onPause={pauseTask}

@@ -73,7 +73,7 @@ function TaskItem({
 
   return (
     <div 
-      className={`task-item ${task.status} ${isRunning ? 'running' : ''} ${task.isUrgent ? 'urgent' : ''} ${isDragging ? 'dragging' : ''} ${isDragOver ? 'drag-over' : ''}`}
+      className={`task-item ${task.status} ${isRunning ? 'running' : ''} ${task.isUrgent ? 'urgent' : ''} ${isDragging ? 'dragging' : ''} ${isDragOver ? 'drag-over' : ''} ${isEditMode ? 'edit-mode' : ''}`}
       draggable={true}
       onDragStart={onDragStart}
       onDragOver={onDragOver}
@@ -96,7 +96,7 @@ function TaskItem({
       <div className="task-content">
         <div className="task-info">
           <div 
-            className="task-description"
+            className={`task-description ${isEditMode ? 'editable' : ''}`}
             onDoubleClick={() => handleDoubleClick('description', task.description)}
           >
             {task.isUrgent && <span className="urgent-badge"><UrgentIcon size={16} /></span>}
@@ -116,7 +116,7 @@ function TaskItem({
           </div>
           {(task.details || isEditMode) && (
             <div 
-              className="task-details"
+              className={`task-details ${isEditMode ? 'editable' : ''}`}
               onDoubleClick={() => handleDoubleClick('details', task.details)}
             >
               {editingField === 'details' ? (
@@ -139,7 +139,7 @@ function TaskItem({
             <span className="task-start-time">{startTime}</span>
             {(task.requester || isEditMode) && (
               <span 
-                className="task-requester"
+                className={`task-requester ${isEditMode ? 'editable' : ''}`}
                 onDoubleClick={() => handleDoubleClick('requester', task.requester)}
               >
                 {editingField === 'requester' ? (
@@ -165,7 +165,7 @@ function TaskItem({
           </div>
         </div>
         <div 
-          className="task-time"
+          className={`task-time ${isEditMode ? 'editable' : ''}`}
           onDoubleClick={() => handleDoubleClick('time', task.totalDurationSeconds)}
           title={isEditMode ? 'Clique duas vezes para editar (formato: HH:mm:ss)' : ''}
         >
