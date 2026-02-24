@@ -1,4 +1,5 @@
 import { formatDuration } from '../utils/timeFormatter';
+import { DragHandleIcon, RemoveIcon, UrgentIcon, PlayIcon, PauseIcon, CheckIcon, ReloadIcon } from './Icons';
 import '../styles/TaskItem.css';
 
 function TaskItem({
@@ -30,31 +31,29 @@ function TaskItem({
   return (
     <div 
       className={`task-item ${task.status} ${isRunning ? 'running' : ''} ${task.isUrgent ? 'urgent' : ''} ${isDragging ? 'dragging' : ''} ${isDragOver ? 'drag-over' : ''}`}
-      draggable={!isRunning}
+      draggable={true}
       onDragStart={onDragStart}
       onDragOver={onDragOver}
       onDragLeave={onDragLeave}
       onDrop={onDrop}
       onDragEnd={onDragEnd}
     >
-      {!isRunning && (
-        <div className="drag-handle" title="Arrastar para reordenar">
-          ⋮⋮
-        </div>
-      )}
+      <div className="drag-handle" title="Arrastar para reordenar">
+        <DragHandleIcon size={16} />
+      </div>
       {isEditMode && (
         <button
           className="btn-delete-task"
           onClick={onDelete}
           title="Excluir registro"
         >
-          −
+          <RemoveIcon size={18} />
         </button>
       )}
       <div className="task-content">
         <div className="task-info">
           <div className="task-description">
-            {task.isUrgent && <span className="urgent-badge">🚨</span>}
+            {task.isUrgent && <span className="urgent-badge"><UrgentIcon size={16} /></span>}
             {task.description}
           </div>
           <div className="task-meta">
@@ -78,7 +77,7 @@ function TaskItem({
                 onClick={onStart}
                 title="Iniciar tarefa"
               >
-                Iniciar
+                <PlayIcon size={18} />
               </button>
             ) : (
               <button
@@ -86,7 +85,7 @@ function TaskItem({
                 onClick={onPause}
                 title="Pausar tarefa"
               >
-                Pausar
+                <PauseIcon size={18} />
               </button>
             )}
             <button
@@ -94,26 +93,26 @@ function TaskItem({
               onClick={onToggleUrgent}
               title="Marcar como urgente"
             >
-              🚨
+              <UrgentIcon size={18} />
             </button>
             <button
               className="btn btn-complete"
               onClick={onComplete}
               title="Concluir tarefa"
             >
-              Concluído
+              <CheckIcon size={18} />
             </button>
           </>
         )}
         {task.status === 'completed' && (
           <>
-            <span className="status-badge">✓ Concluído</span>
+            <span className="status-badge"><CheckIcon size={16} /> Concluído</span>
             <button
               className="btn btn-reopen"
               onClick={onReopen}
               title="Reabrir tarefa"
             >
-              Reabrir
+              <ReloadIcon size={18} />
             </button>
           </>
         )}

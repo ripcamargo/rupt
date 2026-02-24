@@ -3,6 +3,16 @@ const SETTINGS_KEY = 'rupt_settings';
 const DEFAULT_SETTINGS = {
   roundingMode: 'up', // 'up', 'down', 'none'
   roundingStep: 10, // minutes
+  notificationEnabled: true,
+  notificationInterval: 60, // minutes
+  notifyCommonTasks: false,
+  notifyUrgentTasks: true,
+  soundCommonTasks: false,
+  soundUrgentTasks: true,
+  entryTime: '08:00',
+  lunchTime: '12:00',
+  exitTime: '17:00',
+  workHoursNotification: true, // Enable/disable work hours notifications
 };
 
 export function saveSettings(settings) {

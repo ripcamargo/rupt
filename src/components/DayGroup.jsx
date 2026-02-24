@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { formatDateDisplay, isToday } from '../utils/dateGrouping';
 import { formatTime } from '../utils/timeFormatter';
 import { downloadLog } from '../utils/logExporter';
+import { EditIcon, DownloadIcon, ChevronDownIcon } from './Icons';
 import TaskItem from './TaskItem';
 import '../styles/DayGroup.css';
 
@@ -28,14 +29,8 @@ function DayGroup({
     0
   );
 
-  // Separate urgent and normal tasks
-  const urgentTasks = tasks.filter((t) => t.isUrgent);
-  const normalTasks = tasks.filter((t) => !t.isUrgent);
-
-  // Sort by creation time (newest first)
-  const sortedTasks = [...urgentTasks, ...normalTasks].sort(
-    (a, b) => new Date(b.createdAt) - new Date(a.createdAt)
-  );
+  // Use tasks array as is, maintaining user's custom order
+  const sortedTasks = tasks;
 
   const dateDisplay = formatDateDisplay(tasks[0].createdAt);
   const todayLabel = isToday(tasks[0].createdAt) ? ' (Hoje)' : '';
@@ -106,19 +101,19 @@ function DayGroup({
               onClick={handleToggleEditMode}
               title="Editar registros do dia"
             >
-              ✏️
+              <EditIcon size={20} />
             </button>
             <button
               className="btn-download-log"
               onClick={handleDownloadLog}
               title="Baixar log do dia"
             >
-              📥
+              <DownloadIcon size={20} />
             </button>
           </div>
         </div>
         <span className={`day-toggle ${isExpanded ? 'open' : 'closed'}`}>
-          ▼
+          <ChevronDownIcon size={20} />
         </span>
       </button>
 
