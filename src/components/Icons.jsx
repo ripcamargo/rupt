@@ -1,6 +1,6 @@
 import engrenagem from '../assets/engrenagem.png';
 import alerta from '../assets/alerta.png';
-import retornar from '../assets/Retornar.png';
+import retornar from '../assets/retornar.png';
 
 export const SettingsIcon = ({ size = 24 }) => (
   <img 
