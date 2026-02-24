@@ -413,23 +413,7 @@ function App() {
   };
 
   const reorderTasks = (reorderedTasks) => {
-    // Only allow reordering of tasks that are paused, not urgent, and not completed
-    const result = tasks.map((task) => {
-      const reorderedTask = reorderedTasks.find(t => t.id === task.id);
-      
-      if (reorderedTask && task.status !== 'running' && !task.isUrgent && task.status !== 'completed') {
-        // This task was reordered and is allowed to be reordered - use the new version and mark it
-        return {
-          ...reorderedTask,
-          customOrderDate: new Date().toISOString(), // Mark as manually reordered
-        };
-      }
-      
-      // Not reordered or not allowed to be reordered
-      return task;
-    });
-    
-    setTasks(result);
+    setTasks(reorderedTasks);
   };
 
   const handleSaveSettings = (newSettings) => {
@@ -450,32 +434,24 @@ function App() {
   const sortedGroupedTasks = Object.keys(groupedTasks).reduce((acc, dateKey) => {
     const tasksForDate = groupedTasks[dateKey];
     
-    // 1. Tasks in progress (top absolute)
+    // 1. Running tasks (top absolute)
     const runningTasks = tasksForDate.filter(task => task.status === 'running');
     
-    // 2. Urgent tasks (below running, above everything else)
+    // 2. Urgent tasks (below running)
     const urgentTasks = tasksForDate.filter(
       task => task.status !== 'running' && task.status !== 'completed' && task.isUrgent
     );
     
-    // 3. Normal/Paused tasks that can be dragged
+    // 3. Normal/Paused tasks (draggable, keep their order)
     const normalTasks = tasksForDate.filter(
       task => task.status !== 'running' && task.status !== 'completed' && !task.isUrgent
     );
     
-    // Separate manually reordered from auto-ordered
-    const manualNormalTasks = normalTasks.filter(t => t.customOrderDate !== null);
-    const autoNormalTasks = normalTasks.filter(t => t.customOrderDate === null);
-    
-    // Sort manually reordered by date (most recent first)
-    const sortedManualTasks = [...manualNormalTasks].sort((a, b) => {
-      return new Date(b.customOrderDate) - new Date(a.customOrderDate);
-    });
-    
     // 4. Completed tasks (bottom absolute)
     const completedTasks = tasksForDate.filter(task => task.status === 'completed');
     
-    acc[dateKey] = [...runningTasks, ...urgentTasks, ...sortedManualTasks, ...autoNormalTasks, ...completedTasks];
+    // Combine in order
+    acc[dateKey] = [...runningTasks, ...urgentTasks, ...normalTasks, ...completedTasks];
     
     return acc;
   }, {});

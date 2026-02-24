@@ -51,31 +51,80 @@ function DayGroup({
     setDraggedTaskId(taskId);
   };
 
-  const handleDragOver = (e, taskId) => {
+  const handleDragOver = (e) => {
     e.preventDefault();
-    if (draggedTaskId && draggedTaskId !== taskId) {
-      setDragOverTaskId(taskId);
-    }
+    e.dataTransfer.dropEffect = 'move';
   };
 
   const handleDragLeave = () => {
     setDragOverTaskId(null);
   };
 
-  const handleDrop = (e, targetTaskId) => {
-    e.preventDefault();
-    if (draggedTaskId && draggedTaskId !== targetTaskId) {
-      const draggedIndex = sortedTasks.findIndex((t) => t.id === draggedTaskId);
-      const targetIndex = sortedTasks.findIndex((t) => t.id === targetTaskId);
+  const handleDragOverTask = (taskId) => {
+    if (!draggedTaskId || draggedTaskId === taskId) {
+      if (dragOverTaskId !== null) {
+        setDragOverTaskId(null);
+      }
+      return;
+    }
+
+    const draggedTask = sortedTasks.find(t => t.id === draggedTaskId);
+    const targetTask = sortedTasks.find(t => t.id === taskId);
+    
+    // Allow drag between tasks in the same group:
+    // 1. Urgent with Urgent
+    // 2. Normal/Paused with Normal/Paused
+    const bothUrgent = draggedTask?.isUrgent && targetTask?.isUrgent &&
+                       draggedTask.status !== 'running' && draggedTask.status !== 'completed' &&
+                       targetTask.status !== 'running' && targetTask.status !== 'completed';
+    
+    const bothNormal = draggedTask && targetTask && 
+                       !draggedTask.isUrgent && !targetTask.isUrgent &&
+                       draggedTask.status !== 'running' && draggedTask.status !== 'completed' &&
+                       targetTask.status !== 'running' && targetTask.status !== 'completed';
+
+    const canDrag = bothUrgent || bothNormal;
+
+    if (canDrag && dragOverTaskId !== taskId) {
+      setDragOverTaskId(taskId);
+    } else if (!canDrag && dragOverTaskId === taskId) {
+      setDragOverTaskId(null);
+    }
+  };
+
+  const handleDrop = (targetTaskId) => {
+    if (!draggedTaskId || draggedTaskId === targetTaskId) {
+      setDraggedTaskId(null);
+      setDragOverTaskId(null);
+      return;
+    }
+
+    const draggedTask = sortedTasks.find(t => t.id === draggedTaskId);
+    const targetTask = sortedTasks.find(t => t.id === targetTaskId);
+
+    // Validate both are in the same draggable group
+    const bothUrgent = draggedTask?.isUrgent && targetTask?.isUrgent &&
+                       draggedTask.status !== 'running' && draggedTask.status !== 'completed' &&
+                       targetTask.status !== 'running' && targetTask.status !== 'completed';
+    
+    const bothNormal = draggedTask && targetTask && 
+                       !draggedTask.isUrgent && !targetTask.isUrgent &&
+                       draggedTask.status !== 'running' && draggedTask.status !== 'completed' &&
+                       targetTask.status !== 'running' && targetTask.status !== 'completed';
+
+    if (bothUrgent || bothNormal) {
+      const draggedIndex = sortedTasks.findIndex(t => t.id === draggedTaskId);
+      const targetIndex = sortedTasks.findIndex(t => t.id === targetTaskId);
       
       if (draggedIndex !== -1 && targetIndex !== -1) {
         const newOrder = [...sortedTasks];
-        const [draggedTask] = newOrder.splice(draggedIndex, 1);
-        newOrder.splice(targetIndex, 0, draggedTask);
+        const [draggedTaskObj] = newOrder.splice(draggedIndex, 1);
+        newOrder.splice(targetIndex, 0, draggedTaskObj);
         
         onReorderTasks(newOrder);
       }
     }
+
     setDraggedTaskId(null);
     setDragOverTaskId(null);
   };
@@ -139,9 +188,9 @@ function DayGroup({
               isDragging={draggedTaskId === task.id}
               isDragOver={dragOverTaskId === task.id}
               onDragStart={() => handleDragStart(task.id)}
-              onDragOver={(e) => handleDragOver(e, task.id)}
+              onDragOver={() => handleDragOverTask(task.id)}
               onDragLeave={handleDragLeave}
-              onDrop={(e) => handleDrop(e, task.id)}
+              onDrop={() => handleDrop(task.id)}
               onDragEnd={handleDragEnd}
             />
           ))}

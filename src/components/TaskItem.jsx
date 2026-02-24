@@ -71,14 +71,31 @@ function TaskItem({
     }
   };
 
+  const handleDragStartLocal = (e) => {
+    e.dataTransfer.effectAllowed = 'move';
+    onDragStart();
+  };
+
+  const handleDragOverLocal = (e) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    onDragOver();
+  };
+
+  const handleDropLocal = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    onDrop();
+  };
+
   return (
     <div 
       className={`task-item ${task.status} ${isRunning ? 'running' : ''} ${task.isUrgent ? 'urgent' : ''} ${isDragging ? 'dragging' : ''} ${isDragOver ? 'drag-over' : ''} ${isEditMode ? 'edit-mode' : ''}`}
       draggable={true}
-      onDragStart={onDragStart}
-      onDragOver={onDragOver}
+      onDragStart={handleDragStartLocal}
+      onDragOver={handleDragOverLocal}
       onDragLeave={onDragLeave}
-      onDrop={onDrop}
+      onDrop={handleDropLocal}
       onDragEnd={onDragEnd}
     >
       <div className="drag-handle" title="Arrastar para reordenar">

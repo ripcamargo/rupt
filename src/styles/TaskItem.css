@@ -40,7 +40,7 @@
   border: 1px solid #3a3a3a;
   border-radius: 6px;
   margin-bottom: 0.75rem;
-  transition: all 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+  transition: all 0.2s ease-out;
   position: relative;
   cursor: grab;
   animation: statusChange 0.5s ease-out;
@@ -51,16 +51,18 @@
 }
 
 .task-item.dragging {
-  opacity: 0.5;
-  transform: scale(0.95);
+  opacity: 0.4;
+  transform: scale(0.95) rotateZ(2deg);
   cursor: grabbing;
+  background-color: #1a1a1a;
 }
 
 .task-item.drag-over {
+  transform: translateY(6px);
   border-color: #4adeb9;
-  background-color: #1a2a1a;
-  transform: translateY(-4px);
-  box-shadow: 0 4px 12px rgba(74, 222, 185, 0.3);
+  background-color: #1a3a2a;
+  margin-bottom: 1.25rem;
+  box-shadow: inset 0 0 8px rgba(74, 222, 185, 0.2), 0 4px 12px rgba(74, 222, 185, 0.3);
 }
 
 .task-item:hover {
@@ -94,6 +96,7 @@
 .task-item.completed {
   opacity: 0.6;
   border-color: #3a3a3a;
+  cursor: not-allowed;
 }
 
 .task-content {
