@@ -285,7 +285,7 @@ function App() {
       );
     }
 
-    // Start the new task - reset customOrderDate to make it float to top automatically
+    // Start the new task - it will automatically go to top due to status sorting
     setTasks((prevTasks) =>
       prevTasks.map((task) =>
         task.id === taskId
@@ -293,7 +293,6 @@ function App() {
               ...task,
               status: 'running',
               startedAt: new Date().toISOString(),
-              customOrderDate: null, // Reset to ignore manual ordering, float to top
             }
           : task
       )
@@ -350,7 +349,7 @@ function App() {
           ? { 
               ...task, 
               isUrgent: !task.isUrgent,
-              customOrderDate: null, // Reset to ignore manual ordering, float based on urgency
+              // Urgent tasks will automatically position below running due to status sorting
             }
           : task
       )
@@ -414,34 +413,19 @@ function App() {
   };
 
   const reorderTasks = (reorderedTasks) => {
-    // Get the date from the first task in the reordered group
-    const dateOfReorderedTasks = reorderedTasks.length > 0 
-      ? new Date(reorderedTasks[0].createdAt).toLocaleDateString('pt-BR')
-      : null;
-    
-    // Mark ALL tasks from this day as having custom order
-    // This locks the entire day into manual ordering mode
+    // Only allow reordering of tasks that are paused, not urgent, and not completed
     const result = tasks.map((task) => {
-      const taskDate = new Date(task.createdAt).toLocaleDateString('pt-BR');
-      
-      // If this task is part of the reordered group, update it from the reordered list
       const reorderedTask = reorderedTasks.find(t => t.id === task.id);
       
-      if (reorderedTask && taskDate === dateOfReorderedTasks) {
-        // This is a reordered task - use the new version and mark it
+      if (reorderedTask && task.status !== 'running' && !task.isUrgent && task.status !== 'completed') {
+        // This task was reordered and is allowed to be reordered - use the new version and mark it
         return {
           ...reorderedTask,
-          customOrderDate: dateOfReorderedTasks,
-        };
-      } else if (taskDate === dateOfReorderedTasks) {
-        // This task is from the same day but wasn't reordered - just mark it
-        return {
-          ...task,
-          customOrderDate: dateOfReorderedTasks,
+          customOrderDate: new Date().toISOString(), // Mark as manually reordered
         };
       }
       
-      // Different day - don't change
+      // Not reordered or not allowed to be reordered
       return task;
     });
     
@@ -466,35 +450,32 @@ function App() {
   const sortedGroupedTasks = Object.keys(groupedTasks).reduce((acc, dateKey) => {
     const tasksForDate = groupedTasks[dateKey];
     
-    // Separate completed from active tasks
-    const activeTasks = tasksForDate.filter(task => task.status !== 'completed');
-    const completedTasks = tasksForDate.filter(task => task.status === 'completed');
+    // 1. Tasks in progress (top absolute)
+    const runningTasks = tasksForDate.filter(task => task.status === 'running');
     
-    // Separate auto-ordered and manually-ordered tasks
-    const autoOrderedTasks = activeTasks.filter(task => task.customOrderDate === null);
-    const manualOrderedTasks = activeTasks.filter(task => task.customOrderDate !== null);
+    // 2. Urgent tasks (below running, above everything else)
+    const urgentTasks = tasksForDate.filter(
+      task => task.status !== 'running' && task.status !== 'completed' && task.isUrgent
+    );
     
-    // Sort auto-ordered tasks
-    const sortedAutoTasks = [...autoOrderedTasks].sort((a, b) => {
-      // First by status - running first, then paused
-      const statusOrder = { 'paused': 0, 'running': 1 };
-      const statusA = statusOrder[a.status] || 0;
-      const statusB = statusOrder[b.status] || 0;
-      
-      if (statusA !== statusB) {
-        return statusB - statusA; // Higher status value = higher priority = comes first
-      }
-      
-      // Same status - urgent at top
-      if (a.isUrgent !== b.isUrgent) {
-        return a.isUrgent ? -1 : 1;
-      }
-      
-      return 0;
+    // 3. Normal/Paused tasks that can be dragged
+    const normalTasks = tasksForDate.filter(
+      task => task.status !== 'running' && task.status !== 'completed' && !task.isUrgent
+    );
+    
+    // Separate manually reordered from auto-ordered
+    const manualNormalTasks = normalTasks.filter(t => t.customOrderDate !== null);
+    const autoNormalTasks = normalTasks.filter(t => t.customOrderDate === null);
+    
+    // Sort manually reordered by date (most recent first)
+    const sortedManualTasks = [...manualNormalTasks].sort((a, b) => {
+      return new Date(b.customOrderDate) - new Date(a.customOrderDate);
     });
     
-    // Combine: auto-ordered tasks (with proper sorting) first, then manually-ordered tasks, then completed
-    acc[dateKey] = [...sortedAutoTasks, ...manualOrderedTasks, ...completedTasks];
+    // 4. Completed tasks (bottom absolute)
+    const completedTasks = tasksForDate.filter(task => task.status === 'completed');
+    
+    acc[dateKey] = [...runningTasks, ...urgentTasks, ...sortedManualTasks, ...autoNormalTasks, ...completedTasks];
     
     return acc;
   }, {});
