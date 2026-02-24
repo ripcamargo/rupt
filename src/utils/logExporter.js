@@ -89,6 +89,9 @@ export function generateLogText(tasks, date = null) {
       if (task.isUrgent) {
         lines.push(`   🚨 URGENTE`);
       }
+      if (task.manuallyEdited) {
+        lines.push(`   ⚠️ Contador editado manualmente`);
+      }
       lines.push('');
     });
 

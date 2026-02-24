@@ -57,60 +57,6 @@ function SettingsModal({ isOpen, onClose, settings, onSave, allTasks }) {
 
         <div className="modal-body">
           <div className="settings-section">
-            <h3>Arredondar Períodos</h3>
-            
-            <div className="radio-group">
-              <label className="radio-option">
-                <input
-                  type="radio"
-                  name="rounding"
-                  value="up"
-                  checked={roundingMode === 'up'}
-                  onChange={(e) => setRoundingMode(e.target.value)}
-                />
-                <span>Para Cima</span>
-              </label>
-
-              <label className="radio-option">
-                <input
-                  type="radio"
-                  name="rounding"
-                  value="down"
-                  checked={roundingMode === 'down'}
-                  onChange={(e) => setRoundingMode(e.target.value)}
-                />
-                <span>Para Baixo</span>
-              </label>
-
-              <label className="radio-option">
-                <input
-                  type="radio"
-                  name="rounding"
-                  value="none"
-                  checked={roundingMode === 'none'}
-                  onChange={(e) => setRoundingMode(e.target.value)}
-                />
-                <span>Não Arredondar</span>
-              </label>
-            </div>
-
-            {(roundingMode === 'up' || roundingMode === 'down') && (
-              <div className="step-setting">
-                <label htmlFor="step">Passo do arredondamento (minutos):</label>
-                <input
-                  id="step"
-                  type="number"
-                  min="1"
-                  max="60"
-                  value={roundingStep}
-                  onChange={(e) => setRoundingStep(parseInt(e.target.value) || 10)}
-                  className="step-input"
-                />
-              </div>
-            )}
-          </div>
-
-          <div className="settings-section">
             <h3>Notificações</h3>
             
             <label className="checkbox-option">
@@ -181,6 +127,70 @@ function SettingsModal({ isOpen, onClose, settings, onSave, allTasks }) {
           </div>
 
           <div className="settings-section">
+            <h3>Campos Obrigatórios</h3>
+            
+            <label className="checkbox-option disabled">
+              <input
+                type="checkbox"
+                checked={true}
+                disabled={true}
+              />
+              <span>Assunto (sempre obrigatório)</span>
+            </label>
+
+            <label className="checkbox-option">
+              <input
+                type="checkbox"
+                checked={requireDetails}
+                onChange={(e) => setRequireDetails(e.target.checked)}
+              />
+              <span>Descrição</span>
+            </label>
+
+            <label className="checkbox-option">
+              <input
+                type="checkbox"
+                checked={requireRequester}
+                onChange={(e) => setRequireRequester(e.target.checked)}
+              />
+              <span>Solicitante</span>
+            </label>
+          </div>
+
+          <div className="settings-section">
+            <h3>Arredondar Períodos</h3>
+            
+            <div className="sentence-setting">
+              <span className="sentence-text">Ao concluir uma tarefa,</span>
+              <select
+                className="sentence-select"
+                value={roundingMode}
+                onChange={(e) => setRoundingMode(e.target.value)}
+              >
+                <option value="none">Não Arredondar</option>
+                <option value="up">Arredondar para cima</option>
+                <option value="down">Arredondar para baixo</option>
+              </select>
+              <span className="sentence-text">o tempo contabilizado</span>
+              {(roundingMode === 'up' || roundingMode === 'down') && (
+                <>
+                  <span className="sentence-text">em</span>
+                  <input
+                    type="number"
+                    min="1"
+                    max="60"
+                    value={roundingStep}
+                    onChange={(e) => setRoundingStep(parseInt(e.target.value) || 10)}
+                    className="sentence-input"
+                  />
+                  <span className="sentence-text">minuto(s)</span>
+                </>
+              )}
+              <span className="sentence-text">.</span>
+            </div>
+          </div>
+
+          <div className="settings-section">
             <h3>Horário de Trabalho</h3>
             
             <label className="checkbox-option">
@@ -228,37 +238,6 @@ function SettingsModal({ isOpen, onClose, settings, onSave, allTasks }) {
                 </div>
               </div>
             )}
-          </div>
-
-          <div className="settings-section">
-            <h3>Campos Obrigatórios</h3>
-            
-            <label className="checkbox-option disabled">
-              <input
-                type="checkbox"
-                checked={true}
-                disabled={true}
-              />
-              <span>Assunto (sempre obrigatório)</span>
-            </label>
-
-            <label className="checkbox-option">
-              <input
-                type="checkbox"
-                checked={requireDetails}
-                onChange={(e) => setRequireDetails(e.target.checked)}
-              />
-              <span>Descrição</span>
-            </label>
-
-            <label className="checkbox-option">
-              <input
-                type="checkbox"
-                checked={requireRequester}
-                onChange={(e) => setRequireRequester(e.target.checked)}
-              />
-              <span>Solicitante</span>
-            </label>
           </div>
 
           <div className="settings-section">

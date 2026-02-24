@@ -290,11 +290,14 @@ function App() {
     setTasks((prevTasks) =>
       prevTasks.map((task) => {
         if (task.id === taskId) {
-          const roundedSeconds = roundSeconds(
-            task.totalDurationSeconds,
-            settings.roundingMode,
-            settings.roundingStep
-          );
+          // Don't apply rounding if task was manually edited
+          const roundedSeconds = task.manuallyEdited 
+            ? task.totalDurationSeconds
+            : roundSeconds(
+                task.totalDurationSeconds,
+                settings.roundingMode,
+                settings.roundingStep
+              );
           return {
             ...task,
             totalDurationSeconds: roundedSeconds,
@@ -328,6 +331,35 @@ function App() {
           ? { ...task, [field]: value }
           : task
       )
+    );
+  };
+
+  const editTaskTime = (taskId, newSeconds) => {
+    setTasks((prevTasks) =>
+      prevTasks.map((task) => {
+        if (task.id === taskId) {
+          // Add marker to details (description field) if not already present
+          const marker = '*Contador manipulado manualmente';
+          let newDetails = task.details || '';
+          
+          if (!newDetails.includes(marker)) {
+            // Add marker at the end
+            if (newDetails.trim()) {
+              newDetails = newDetails.trim() + ' ' + marker;
+            } else {
+              newDetails = marker;
+            }
+          }
+          
+          return {
+            ...task,
+            totalDurationSeconds: newSeconds,
+            manuallyEdited: true,
+            details: newDetails,
+          };
+        }
+        return task;
+      })
     );
   };
 
@@ -488,6 +520,7 @@ function App() {
                 onDelete={deleteTask}
                 onReorderTasks={reorderTasks}
                 onUpdateTask={updateTask}
+                onEditTime={editTaskTime}
               />
             ))
           )}

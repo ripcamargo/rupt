@@ -18,6 +18,7 @@ function DayGroup({
   onDelete,
   onReorderTasks,
   onUpdateTask,
+  onEditTime,
 }) {
   const [isExpanded, setIsExpanded] = useState(isToday(tasks[0].createdAt));
   const [isEditMode, setIsEditMode] = useState(false);
@@ -134,6 +135,7 @@ function DayGroup({
               isEditMode={isEditMode}
               onDelete={() => onDelete(task.id)}
               onUpdateTask={onUpdateTask}
+              onEditTime={onEditTime}
               isDragging={draggedTaskId === task.id}
               isDragOver={dragOverTaskId === task.id}
               onDragStart={() => handleDragStart(task.id)}
