@@ -16,6 +16,8 @@ function SettingsModal({ isOpen, onClose, settings, onSave, allTasks }) {
   const [lunchTime, setLunchTime] = useState(settings.lunchTime);
   const [exitTime, setExitTime] = useState(settings.exitTime);
   const [workHoursNotification, setWorkHoursNotification] = useState(settings.workHoursNotification);
+  const [requireDetails, setRequireDetails] = useState(settings.requireDetails);
+  const [requireRequester, setRequireRequester] = useState(settings.requireRequester);
 
   if (!isOpen) return null;
 
@@ -33,6 +35,8 @@ function SettingsModal({ isOpen, onClose, settings, onSave, allTasks }) {
       lunchTime,
       exitTime,
       workHoursNotification,
+      requireDetails,
+      requireRequester,
     });
     onClose();
   };
@@ -224,6 +228,37 @@ function SettingsModal({ isOpen, onClose, settings, onSave, allTasks }) {
                 </div>
               </div>
             )}
+          </div>
+
+          <div className="settings-section">
+            <h3>Campos Obrigatórios</h3>
+            
+            <label className="checkbox-option disabled">
+              <input
+                type="checkbox"
+                checked={true}
+                disabled={true}
+              />
+              <span>Assunto (sempre obrigatório)</span>
+            </label>
+
+            <label className="checkbox-option">
+              <input
+                type="checkbox"
+                checked={requireDetails}
+                onChange={(e) => setRequireDetails(e.target.checked)}
+              />
+              <span>Descrição</span>
+            </label>
+
+            <label className="checkbox-option">
+              <input
+                type="checkbox"
+                checked={requireRequester}
+                onChange={(e) => setRequireRequester(e.target.checked)}
+              />
+              <span>Solicitante</span>
+            </label>
           </div>
 
           <div className="settings-section">

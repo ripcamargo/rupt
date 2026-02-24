@@ -14,8 +14,9 @@ function App() {
   const [tasks, setTasks] = useState([]);
   const [input, setInput] = useState('');
   const [runningTaskId, setRunningTaskId] = useState(null);
-  const [step, setStep] = useState('description'); // 'description' or 'requester'
+  const [step, setStep] = useState('description'); // 'description', 'details', or 'requester'
   const [tempDescription, setTempDescription] = useState('');
+  const [tempDetails, setTempDetails] = useState(''); // New: task details field
   const [settings, setSettings] = useState(loadSettings());
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const inputRef = useRef(null);
@@ -175,44 +176,75 @@ function App() {
 
   const createTask = (e) => {
     e.preventDefault();
-    if (input.trim()) {
+    if (input.trim() || (step === 'details' && !settings.requireDetails) || (step === 'requester' && !settings.requireRequester)) {
       if (step === 'description') {
-        // First step: save description and move to requester step
-        setTempDescription(input.trim());
+        // First step: save description and decide next step
+        const description = input.trim();
+        setTempDescription(description);
         setInput('');
-        setStep('requester');
-      } else {
-        // Second step: create task with description and requester
-        const newTask = {
-          id: Date.now(),
-          description: tempDescription,
-          requester: input.trim(),
-          createdAt: new Date().toISOString(),
-          startedAt: new Date().toISOString(),
-          totalDurationSeconds: 0,
-          status: 'running',
-          isUrgent: false,
-        };
-
-        // Pause current running task
-        if (runningTaskId) {
-          setTasks((prevTasks) =>
-            prevTasks.map((task) =>
-              task.id === runningTaskId
-                ? { ...task, status: 'paused' }
-                : task
-            )
-          );
+        
+        // Check if we need details step
+        if (settings.requireDetails) {
+          setStep('details');
+        } else {
+          setTempDetails('');
+          // Check if we need requester step
+          if (settings.requireRequester) {
+            setStep('requester');
+          } else {
+            // Create task directly with values
+            createTaskWithData(description, '', '');
+          }
         }
-
-        setTasks((prevTasks) => [newTask, ...prevTasks]);
-        setRunningTaskId(newTask.id);
+      } else if (step === 'details') {
+        // Second step: save details and move to requester step (or skip if not required)
+        const details = input.trim();
+        setTempDetails(details);
         setInput('');
-        setStep('description');
-        setTempDescription('');
+        if (settings.requireRequester) {
+          setStep('requester');
+        } else {
+          // Create task without requester
+          createTaskWithData(tempDescription, details, '');
+        }
+      } else {
+        // Third step: create task with all data
+        createTaskWithData(tempDescription, tempDetails, input.trim());
       }
       inputRef.current?.focus();
     }
+  };
+
+  const createTaskWithData = (description, details, requester) => {
+    const newTask = {
+      id: Date.now(),
+      description: description,
+      details: details,
+      requester: requester,
+      createdAt: new Date().toISOString(),
+      startedAt: new Date().toISOString(),
+      totalDurationSeconds: 0,
+      status: 'running',
+      isUrgent: false,
+    };
+
+    // Pause current running task
+    if (runningTaskId) {
+      setTasks((prevTasks) =>
+        prevTasks.map((task) =>
+          task.id === runningTaskId
+            ? { ...task, status: 'paused' }
+            : task
+        )
+      );
+    }
+
+    setTasks((prevTasks) => [newTask, ...prevTasks]);
+    setRunningTaskId(newTask.id);
+    setInput('');
+    setStep('description');
+    setTempDescription('');
+    setTempDetails('');
   };
 
   const startTask = (taskId) => {
@@ -284,6 +316,16 @@ function App() {
       prevTasks.map((task) =>
         task.id === taskId
           ? { ...task, isUrgent: !task.isUrgent }
+          : task
+      )
+    );
+  };
+
+  const updateTask = (taskId, field, value) => {
+    setTasks((prevTasks) =>
+      prevTasks.map((task) =>
+        task.id === taskId
+          ? { ...task, [field]: value }
           : task
       )
     );
@@ -375,14 +417,14 @@ function App() {
               type="text"
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              placeholder="Digite a descrição da tarefa e pressione Enter..."
+              placeholder="Digite o assunto da tarefa e pressione Enter..."
               className="task-input"
               autoFocus
             />
-          ) : (
+          ) : step === 'details' ? (
             <div className="task-creation-row">
               <div className="task-preview">
-                <span className="task-preview-label">Tarefa:</span>
+                <span className="task-preview-label">Assunto:</span>
                 <span className="task-preview-text">{tempDescription}</span>
               </div>
               <input
@@ -390,7 +432,32 @@ function App() {
                 type="text"
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
-                placeholder="Nome do solicitante..."
+                placeholder={settings.requireDetails ? "Descrição detalhada..." : "Descrição (opcional)..."}
+                className="task-input"
+                autoFocus
+              />
+              <button type="submit" className="btn-create">
+                {settings.requireRequester ? 'Avançar' : 'Criar'}
+              </button>
+            </div>
+          ) : (
+            <div className="task-creation-row">
+              <div className="task-preview">
+                <span className="task-preview-label">Assunto:</span>
+                <span className="task-preview-text">{tempDescription}</span>
+                {tempDetails && (
+                  <>
+                    <span className="task-preview-label"> • </span>
+                    <span className="task-preview-text">{tempDetails}</span>
+                  </>
+                )}
+              </div>
+              <input
+                ref={inputRef}
+                type="text"
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                placeholder={settings.requireRequester ? "Nome do solicitante..." : "Solicitante (opcional)..."}
                 className="task-input requester-input"
                 autoFocus
               />
@@ -420,6 +487,7 @@ function App() {
                 onReopen={reopenTask}
                 onDelete={deleteTask}
                 onReorderTasks={reorderTasks}
+                onUpdateTask={updateTask}
               />
             ))
           )}
@@ -427,7 +495,12 @@ function App() {
       </main>
 
       <footer className="app-footer">
-        <p>1º Enter: Descrição da tarefa • 2º Enter ou Criar: Nome do solicitante • Clique no ícone de alerta para marcar como urgente</p>
+        <p>
+          1º Enter: Assunto
+          {settings.requireDetails && ' • 2º Enter: Descrição'}
+          {settings.requireRequester && ` • ${settings.requireDetails ? '3º' : '2º'} Enter: Solicitante`}
+          {' • Duplo clique para editar • Ícone de alerta marca como urgente'}
+        </p>
       </footer>
 
       <SettingsModal

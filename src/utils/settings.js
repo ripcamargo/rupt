@@ -13,6 +13,8 @@ const DEFAULT_SETTINGS = {
   lunchTime: '12:00',
   exitTime: '17:00',
   workHoursNotification: true, // Enable/disable work hours notifications
+  requireDetails: false, // Require task details field
+  requireRequester: true, // Require requester field
 };
 
 export function saveSettings(settings) {

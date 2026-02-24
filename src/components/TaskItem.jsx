@@ -1,5 +1,6 @@
 import { formatDuration } from '../utils/timeFormatter';
 import { DragHandleIcon, RemoveIcon, UrgentIcon, PlayIcon, PauseIcon, CheckIcon, ReloadIcon } from './Icons';
+import { useState } from 'react';
 import '../styles/TaskItem.css';
 
 function TaskItem({
@@ -13,6 +14,7 @@ function TaskItem({
   onReopen,
   isEditMode,
   onDelete,
+  onUpdateTask,
   isDragging,
   isDragOver,
   onDragStart,
@@ -21,12 +23,37 @@ function TaskItem({
   onDrop,
   onDragEnd,
 }) {
+  const [editingField, setEditingField] = useState(null);
+  const [editValue, setEditValue] = useState('');
+
   const totalSeconds = task.totalDurationSeconds + (isRunning ? elapsedSeconds : 0);
 
   const startTime = new Date(task.startedAt).toLocaleTimeString('pt-BR', {
     hour: '2-digit',
     minute: '2-digit',
   });
+
+  const handleDoubleClick = (field, value) => {
+    setEditingField(field);
+    setEditValue(value || '');
+  };
+
+  const handleEditBlur = () => {
+    if (editingField && editValue.trim() !== task[editingField]) {
+      onUpdateTask(task.id, editingField, editValue.trim());
+    }
+    setEditingField(null);
+    setEditValue('');
+  };
+
+  const handleEditKeyDown = (e) => {
+    if (e.key === 'Enter') {
+      handleEditBlur();
+    } else if (e.key === 'Escape') {
+      setEditingField(null);
+      setEditValue('');
+    }
+  };
 
   return (
     <div 
@@ -52,15 +79,65 @@ function TaskItem({
       )}
       <div className="task-content">
         <div className="task-info">
-          <div className="task-description">
+          <div 
+            className="task-description"
+            onDoubleClick={() => !isEditMode && handleDoubleClick('description', task.description)}
+          >
             {task.isUrgent && <span className="urgent-badge"><UrgentIcon size={16} /></span>}
-            {task.description}
+            {editingField === 'description' ? (
+              <input
+                type="text"
+                value={editValue}
+                onChange={(e) => setEditValue(e.target.value)}
+                onBlur={handleEditBlur}
+                onKeyDown={handleEditKeyDown}
+                autoFocus
+                className="task-edit-input"
+              />
+            ) : (
+              task.description
+            )}
           </div>
+          {task.details && (
+            <div 
+              className="task-details"
+              onDoubleClick={() => !isEditMode && handleDoubleClick('details', task.details)}
+            >
+              {editingField === 'details' ? (
+                <input
+                  type="text"
+                  value={editValue}
+                  onChange={(e) => setEditValue(e.target.value)}
+                  onBlur={handleEditBlur}
+                  onKeyDown={handleEditKeyDown}
+                  autoFocus
+                  className="task-edit-input"
+                />
+              ) : (
+                task.details
+              )}
+            </div>
+          )}
           <div className="task-meta">
             <span className="task-start-time">{startTime}</span>
             {task.requester && (
-              <span className="task-requester">
-                <span className="requester-name">{task.requester}</span>
+              <span 
+                className="task-requester"
+                onDoubleClick={() => !isEditMode && handleDoubleClick('requester', task.requester)}
+              >
+                {editingField === 'requester' ? (
+                  <input
+                    type="text"
+                    value={editValue}
+                    onChange={(e) => setEditValue(e.target.value)}
+                    onBlur={handleEditBlur}
+                    onKeyDown={handleEditKeyDown}
+                    autoFocus
+                    className="task-edit-input requester-input"
+                  />
+                ) : (
+                  <span className="requester-name">{task.requester}</span>
+                )}
               </span>
             )}
           </div>
