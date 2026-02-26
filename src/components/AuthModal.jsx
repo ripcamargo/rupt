@@ -52,8 +52,15 @@ function AuthModal({ isOpen, onClose }) {
           password
         );
         await updateProfile(result.user, { displayName: name.trim() });
-        await sendEmailVerification(result.user);
-        setSuccess('Enviamos um link de verificação para seu email. Verifique sua caixa de entrada.');
+        
+        // Configurações do email de verificação
+        const actionCodeSettings = {
+          url: window.location.origin,
+          handleCodeInApp: false,
+        };
+        
+        await sendEmailVerification(result.user, actionCodeSettings);
+        setSuccess('🎉 Conta criada! Enviamos um link de verificação para seu email. Verifique sua caixa de entrada.');
         setTimeout(() => handleClose(), 3000);
       } else {
         await signInWithEmailAndPassword(auth, email.trim(), password);

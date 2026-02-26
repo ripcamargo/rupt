@@ -566,10 +566,16 @@ function App() {
     
     setIsResendingEmail(true);
     try {
-      await sendEmailVerification(user);
-      alert('Email de verificação enviado! Verifique sua caixa de entrada.');
+      // Configurações do email de verificação
+      const actionCodeSettings = {
+        url: window.location.origin,
+        handleCodeInApp: false,
+      };
+      
+      await sendEmailVerification(user, actionCodeSettings);
+      alert('✅ Email de verificação enviado com sucesso! Verifique sua caixa de entrada e pasta de spam.');
     } catch (err) {
-      alert('Erro ao enviar email. Tente novamente mais tarde.');
+      alert('❌ Erro ao enviar email. Tente novamente mais tarde.');
     } finally {
       setIsResendingEmail(false);
     }
