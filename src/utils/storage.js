@@ -1,26 +1,17 @@
 /**
  * LocalStorage helpers for persistent task data
+ * Now maintains full history across all days
  */
 
 const STORAGE_KEY = 'rupt_tasks';
-const STORAGE_DATE_KEY = 'rupt_date';
-
-/**
- * Check if we're on a new day
- */
-export const isNewDay = () => {
-  const storedDate = localStorage.getItem(STORAGE_DATE_KEY);
-  const today = new Date().toDateString();
-  return storedDate !== today;
-};
 
 /**
  * Save tasks to LocalStorage
+ * All tasks are saved regardless of date
  */
 export const saveTasks = (tasks) => {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(tasks));
-    localStorage.setItem(STORAGE_DATE_KEY, new Date().toDateString());
   } catch (error) {
     console.error('Failed to save tasks:', error);
   }
@@ -28,18 +19,11 @@ export const saveTasks = (tasks) => {
 
 /**
  * Load tasks from LocalStorage
+ * Returns all tasks from history
  */
 export const loadTasks = () => {
   try {
     const stored = localStorage.getItem(STORAGE_KEY);
-    
-    // If it's a new day, don't load old tasks
-    if (isNewDay()) {
-      localStorage.removeItem(STORAGE_KEY);
-      localStorage.setItem(STORAGE_DATE_KEY, new Date().toDateString());
-      return [];
-    }
-    
     return stored ? JSON.parse(stored) : [];
   } catch (error) {
     console.error('Failed to load tasks:', error);

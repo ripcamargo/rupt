@@ -22,12 +22,22 @@
   justify-content: space-between;
   align-items: center;
   width: 100%;
+  gap: 2rem;
+  position: relative;
+}
+
+.total-time {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  order: -1;
 }
 
 .header-actions {
   display: flex;
   align-items: center;
   gap: 1rem;
+  margin-left: auto;
 }
 
 .app-logo {
@@ -51,25 +61,83 @@
   background-color: #2a2a2a;
   padding: 0.75rem 1.25rem;
   border-radius: 6px;
+  order: 0;
 }
 
 .btn-settings {
-  background-color: #2a2a2a;
+  background-color: transparent;
   border: none;
   border-radius: 6px;
-  padding: 0.75rem;
-  font-size: 1.3rem;
+  padding: 0.25rem;
+  font-size: 0.9rem;
   cursor: pointer;
   transition: all 0.2s ease;
   display: flex;
   align-items: center;
   justify-content: center;
   line-height: 1;
+  opacity: 0.7;
+}
+
+.btn-auth-ghost {
+  background: transparent;
+  border: 1px solid #2a2a2a;
+  color: #cfcfcf;
+  border-radius: 999px;
+  padding: 0.5rem 1rem;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-auth-ghost:hover {
+  border-color: #4adeb9;
+  color: #4adeb9;
+}
+
+.user-status {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: #1f1f1f;
+  border: 1px solid #2a2a2a;
+  padding: 0.45rem 0.8rem;
+  border-radius: 6px;
+}
+
+.user-status .btn-settings {
+  margin-left: 0.35rem;
+}
+
+.user-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: #4adeb9;
+  color: #04110c;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.85rem;
+}
+
+.user-photo {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.user-name {
+  font-size: 0.85rem;
+  color: #e2e2e2;
 }
 
 .btn-settings:hover {
-  background-color: #3a3a3a;
-  transform: scale(1.1);
+  background-color: transparent;
+  transform: scale(1.05);
+  opacity: 1;
 }
 
 .total-time .label {
@@ -85,6 +153,112 @@
   font-weight: 700;
   color: #4adeb9;
   letter-spacing: 1px;
+}
+
+/* Email verification banner */
+.email-verification-banner {
+  background: linear-gradient(135deg, #1a1f2e 0%, #151921 100%);
+  border-bottom: 1px solid #2a3548;
+  padding: 0.85rem 1.5rem;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+.banner-content {
+  max-width: 1200px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.banner-icon {
+  font-size: 1.4rem;
+  flex-shrink: 0;
+}
+
+.banner-text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  flex: 1;
+}
+
+.banner-text strong {
+  color: #f5c842;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.banner-text span {
+  color: #b5b5b5;
+  font-size: 0.8rem;
+}
+
+.banner-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.banner-btn-resend {
+  background: #4adeb9;
+  color: #04110c;
+  border: none;
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.banner-btn-resend:hover {
+  background: #5be896;
+  transform: translateY(-1px);
+}
+
+.banner-btn-resend:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.banner-btn-reload,
+.banner-btn-close {
+  background: transparent;
+  border: 1px solid #3a4558;
+  color: #b5b5b5;
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  font-size: 0.9rem;
+}
+
+.banner-btn-reload:hover,
+.banner-btn-close:hover {
+  border-color: #4adeb9;
+  color: #4adeb9;
+}
+
+@media (max-width: 768px) {
+  .email-verification-banner {
+    padding: 0.75rem 1rem;
+  }
+
+  .banner-content {
+    flex-wrap: wrap;
+    justify-content: center;
+    text-align: center;
+  }
+
+  .banner-text {
+    flex: 1 1 100%;
+  }
 }
 
 .app-main {
@@ -224,26 +398,36 @@
   }
 
   .header-content {
-    flex-direction: column;
+    flex-direction: row;
     gap: 1rem;
     align-items: flex-start;
+  }
+
+  .total-time {
+    position: static;
+    transform: none;
+    order: 0;
+    margin-bottom: 0.5rem;
+    width: 100%;
+    justify-content: center;
   }
 
   .header-actions {
     width: 100%;
     justify-content: space-between;
+    flex-wrap: wrap;
+  }
+
+  .user-status {
+    max-width: 100%;
   }
 
   .app-logo {
-    height: 40px;
+    display: none;
   }
 
   .app-header h1 {
     font-size: 1.4rem;
-  }
-
-  .total-time {
-    flex: 1;
   }
 
   .app-main {

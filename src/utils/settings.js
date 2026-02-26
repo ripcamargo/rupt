@@ -1,6 +1,6 @@
 const SETTINGS_KEY = 'rupt_settings';
 
-const DEFAULT_SETTINGS = {
+export const DEFAULT_SETTINGS = {
   roundingMode: 'up', // 'up', 'down', 'none'
   roundingStep: 10, // minutes
   notificationEnabled: true,

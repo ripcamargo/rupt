@@ -3,7 +3,7 @@ import { downloadLog } from '../utils/logExporter';
 import { CloseIcon, DownloadIcon, InfoIcon } from './Icons';
 import '../styles/SettingsModal.css';
 
-function SettingsModal({ isOpen, onClose, settings, onSave, allTasks }) {
+function SettingsModal({ isOpen, onClose, settings, onSave, allTasks, isLoggedIn }) {
   const [roundingMode, setRoundingMode] = useState(settings.roundingMode);
   const [roundingStep, setRoundingStep] = useState(settings.roundingStep);
   const [notificationEnabled, setNotificationEnabled] = useState(settings.notificationEnabled);
@@ -247,19 +247,21 @@ function SettingsModal({ isOpen, onClose, settings, onSave, allTasks }) {
             </button>
           </div>
 
-          <div className="settings-section info-section">
-            <div className="storage-info">
-              <span className="info-icon"><InfoIcon size={20} /></span>
-              <div className="info-text">
-                <strong>Armazenamento de Dados</strong>
-                <p>
-                  Seus registros ficam salvos localmente no navegador (cache/localStorage). 
-                  Caso você limpe o cache do navegador, todas as informações serão perdidas. 
-                  Recomendamos exportar seus dados periodicamente para não perdê-los.
-                </p>
+          {!isLoggedIn && (
+            <div className="settings-section info-section">
+              <div className="storage-info">
+                <span className="info-icon"><InfoIcon size={20} /></span>
+                <div className="info-text">
+                  <strong>Armazenamento de Dados</strong>
+                  <p>
+                    Seus registros ficam salvos localmente no navegador (cache/localStorage). 
+                    Caso você limpe o cache do navegador, todas as informações serão perdidas. 
+                    Recomendamos exportar seus dados periodicamente para não perdê-los.
+                  </p>
+                </div>
               </div>
             </div>
-          </div>
+          )}
         </div>
 
         <div className="modal-footer">
