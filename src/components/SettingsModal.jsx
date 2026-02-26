@@ -180,7 +180,7 @@ function SettingsModal({ isOpen, onClose, settings, onSave, allTasks, isLoggedIn
                     min="1"
                     max="60"
                     value={roundingStep}
-                    onChange={(e) => setRoundingStep(parseInt(e.target.value) || 10)}
+                    onChange={(e) => setRoundingStep(parseInt(e.target.value) || 5)}
                     className="sentence-input"
                   />
                   <span className="sentence-text">minuto(s)</span>
