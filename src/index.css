@@ -50,11 +50,11 @@ body {
 
 /* Smooth selection */
 ::selection {
-  background-color: #4adeb9;
+  background-color: var(--projectColor);
   color: #000;
 }
 
 ::-moz-selection {
-  background-color: #4adeb9;
+  background-color: var(--projectColor);
   color: #000;
 }

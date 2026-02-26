@@ -64,6 +64,25 @@
   box-shadow: 0 0 0 3px rgba(74, 222, 185, 0.15);
 }
 
+.auth-forgot {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.auth-forgot button {
+  background: none;
+  border: none;
+  color: #9ad9c9;
+  cursor: pointer;
+  font-size: 0.85rem;
+  padding: 0;
+}
+
+.auth-forgot button:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
 .auth-error {
   color: #ff9f9f;
   font-size: 0.85rem;

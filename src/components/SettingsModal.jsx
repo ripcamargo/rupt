@@ -1,9 +1,11 @@
-import { useState } from 'react';
-import { downloadLog } from '../utils/logExporter';
-import { CloseIcon, DownloadIcon, InfoIcon } from './Icons';
+import { useState, useRef } from 'react';
+import { CloseIcon, InfoIcon } from './Icons';
+import ExportImportModal from './ExportImportModal';
 import '../styles/SettingsModal.css';
 
 function SettingsModal({ isOpen, onClose, settings, onSave, allTasks, isLoggedIn }) {
+  const [isExportImportModalOpen, setIsExportImportModalOpen] = useState(false);
+  
   const [roundingMode, setRoundingMode] = useState(settings.roundingMode);
   const [roundingStep, setRoundingStep] = useState(settings.roundingStep);
   const [notificationEnabled, setNotificationEnabled] = useState(settings.notificationEnabled);
@@ -43,6 +45,91 @@ function SettingsModal({ isOpen, onClose, settings, onSave, allTasks, isLoggedIn
 
   const handleDownloadFullLog = () => {
     downloadLog(allTasks);
+  };
+
+  const handleExportJSON = () => {
+    setImportError('');
+    setImportSuccess('');
+    exportTasksAsJSON(allTasks);
+  };
+
+  const handleImportClick = () => {
+    setImportError('');
+    setImportSuccess('');
+    fileInputRef.current?.click();
+  };
+
+  const handleFileSelected = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      const tasks = await importTasksFromJSON(file);
+      
+      // Check for duplicate IDs and merge
+      const existingIds = new Set(allTasks.map(t => t.id));
+      const newTasks = tasks.filter(t => !existingIds.has(t.id));
+      
+      const totalNewTasks = newTasks.length;
+      const totalDuplicated = tasks.length - totalNewTasks;
+      
+      if (totalNewTasks === 0) {
+        setImportError('Nenhuma tarefa nova para importar. Todas as tarefas já existem.');
+      } else {
+        // Callback to parent to add tasks
+        onSave({
+          roundingMode,
+          roundingStep,
+          notificationEnabled,
+          notificationInterval,
+          notifyCommonTasks,
+          notifyUrgentTasks,
+          soundCommonTasks,
+          soundUrgentTasks,
+          entryTime,
+          lunchTime,
+          exitTime,
+          workHoursNotification,
+          requireDetails,
+          requireRequester,
+        }, newTasks);
+        
+        setImportSuccess(
+          `✅ ${totalNewTasks} tarefa${totalNewTasks > 1 ? 's' : ''} importada${totalNewTasks > 1 ? 's' : ''} com sucesso!${
+            totalDuplicated > 0 ? ` (${totalDuplicated} duplicada${totalDuplicated > 1 ? 's' : ''} ignorada${totalDuplicated > 1 ? 's' : ''})` : ''
+          }`
+        );
+      }
+      
+      // Reset file input
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    } catch (err) {
+      setImportError(`❌ ${err.message}`);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  };
+
+  const handleImportFromModal = (newTasks) => {
+    onSave({
+      roundingMode,
+      roundingStep,
+      notificationEnabled,
+      notificationInterval,
+      notifyCommonTasks,
+      notifyUrgentTasks,
+      soundCommonTasks,
+      soundUrgentTasks,
+      entryTime,
+      lunchTime,
+      exitTime,
+      workHoursNotification,
+      requireDetails,
+      requireRequester,
+    }, newTasks);
   };
 
   return (
@@ -241,9 +328,12 @@ function SettingsModal({ isOpen, onClose, settings, onSave, allTasks, isLoggedIn
           </div>
 
           <div className="settings-section">
-            <h3>Exportar Dados</h3>
-            <button className="btn-export" onClick={handleDownloadFullLog}>
-              <DownloadIcon size={18} /> Baixar Log Completo de Atividades
+            <h3>Exportar e Importar Dados</h3>
+            <button 
+              className="btn-export-import-main"
+              onClick={() => setIsExportImportModalOpen(true)}
+            >
+              📊 Exportar/Importar Log de Tarefas
             </button>
           </div>
 
@@ -273,6 +363,13 @@ function SettingsModal({ isOpen, onClose, settings, onSave, allTasks, isLoggedIn
           </button>
         </div>
       </div>
+
+      <ExportImportModal
+        isOpen={isExportImportModalOpen}
+        onClose={() => setIsExportImportModalOpen(false)}
+        allTasks={allTasks}
+        onImport={handleImportFromModal}
+      />
     </div>
   );
 }

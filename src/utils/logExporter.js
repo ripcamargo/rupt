@@ -125,3 +125,63 @@ export function downloadLog(tasks, date = null) {
   document.body.removeChild(link);
   URL.revokeObjectURL(url);
 }
+
+/**
+ * Export tasks as JSON file for import/backup
+ */
+export function exportTasksAsJSON(tasks) {
+  const data = JSON.stringify(tasks, null, 2);
+  const blob = new Blob([data], { type: 'application/json;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  
+  const filename = `rupt-tarefas-${new Date().toISOString().split('T')[0]}.json`;
+  
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+}
+
+/**
+ * Import tasks from JSON file
+ */
+export function importTasksFromJSON(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    
+    reader.onload = (event) => {
+      try {
+        const content = event.target?.result;
+        const tasks = JSON.parse(content);
+        
+        if (!Array.isArray(tasks)) {
+          reject(new Error('O arquivo não contém um array de tarefas válido'));
+          return;
+        }
+        
+        // Validate task structure
+        const validTasks = tasks.filter(task => {
+          return task.id && task.description && task.totalDurationSeconds !== undefined;
+        });
+        
+        if (validTasks.length === 0) {
+          reject(new Error('Nenhuma tarefa válida encontrada no arquivo'));
+          return;
+        }
+        
+        resolve(validTasks);
+      } catch (error) {
+        reject(new Error('Erro ao ler o arquivo JSON: ' + error.message));
+      }
+    };
+    
+    reader.onerror = () => {
+      reject(new Error('Erro ao ler o arquivo'));
+    };
+    
+    reader.readAsText(file);
+  });
+}

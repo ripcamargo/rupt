@@ -2,7 +2,7 @@ const SETTINGS_KEY = 'rupt_settings';
 
 export const DEFAULT_SETTINGS = {
   roundingMode: 'up', // 'up', 'down', 'none'
-  roundingStep: 10, // minutes
+  roundingStep: 5, // minutes
   notificationEnabled: true,
   notificationInterval: 60, // minutes
   notifyCommonTasks: false,

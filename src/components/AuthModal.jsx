@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { createUserWithEmailAndPassword, signInWithEmailAndPassword, updateProfile, sendEmailVerification } from 'firebase/auth';
+import { createUserWithEmailAndPassword, signInWithEmailAndPassword, updateProfile, sendEmailVerification, sendPasswordResetEmail } from 'firebase/auth';
 import { auth } from '../utils/firebase';
 import { CloseIcon } from './Icons';
 import '../styles/AuthModal.css';
@@ -28,12 +28,40 @@ function AuthModal({ isOpen, onClose }) {
     onClose();
   };
 
+  const handlePasswordReset = async () => {
+    setError('');
+    setSuccess('');
+
+    const normalizedEmail = email.trim().toLowerCase();
+    if (!normalizedEmail) {
+      setError('Informe seu email para receber o link de redefinicao.');
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const actionCodeSettings = {
+        url: window.location.origin,
+        handleCodeInApp: false,
+      };
+
+      await sendPasswordResetEmail(auth, normalizedEmail, actionCodeSettings);
+      setSuccess('Enviamos um link para redefinir sua senha. Verifique sua caixa de entrada.');
+    } catch (err) {
+      const message = err?.message || 'Erro ao enviar email de redefinicao. Tente novamente.';
+      setError(message);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   const handleSubmit = async (event) => {
     event.preventDefault();
     setError('');
     setSuccess('');
+    const normalizedEmail = email.trim().toLowerCase();
 
-    if (!email.trim() || !password.trim()) {
+    if (!normalizedEmail || !password.trim()) {
       setError('Informe email e senha.');
       return;
     }
@@ -48,7 +76,7 @@ function AuthModal({ isOpen, onClose }) {
       if (mode === 'signup') {
         const result = await createUserWithEmailAndPassword(
           auth,
-          email.trim(),
+          normalizedEmail,
           password
         );
         await updateProfile(result.user, { displayName: name.trim() });
@@ -63,7 +91,7 @@ function AuthModal({ isOpen, onClose }) {
         setSuccess('🎉 Conta criada! Enviamos um link de verificação para seu email. Verifique sua caixa de entrada.');
         setTimeout(() => handleClose(), 3000);
       } else {
-        await signInWithEmailAndPassword(auth, email.trim(), password);
+        await signInWithEmailAndPassword(auth, normalizedEmail, password);
         handleClose();
       }
     } catch (err) {
@@ -122,6 +150,14 @@ function AuthModal({ isOpen, onClose }) {
               placeholder="Minimo 6 caracteres"
             />
           </label>
+
+          {mode === 'login' && (
+            <div className="auth-forgot">
+              <button type="button" onClick={handlePasswordReset} disabled={isSubmitting}>
+                Esqueci minha senha
+              </button>
+            </div>
+          )}
 
           {error && <p className="auth-error">{error}</p>}
           {success && <p className="auth-success">{success}</p>}

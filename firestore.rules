@@ -4,5 +4,12 @@ service cloud.firestore {
     match /users/{userId} {
       allow read, write: if request.auth != null && request.auth.uid == userId;
     }
+    
+    match /sharedProjects/{projectId} {
+      // Temporary: Allow any authenticated user to write for testing
+      // This will be restricted after we verify it works
+      allow read, write: if request.auth != null;
+      allow delete: if request.auth != null && resource.data.adminId == request.auth.uid;
+    }
   }
 }

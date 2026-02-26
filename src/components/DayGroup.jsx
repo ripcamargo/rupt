@@ -1,8 +1,7 @@
 import { useState } from 'react';
 import { formatDateDisplay, isToday } from '../utils/dateGrouping';
 import { formatTime } from '../utils/timeFormatter';
-import { downloadLog } from '../utils/logExporter';
-import { EditIcon, DownloadIcon, ChevronDownIcon } from './Icons';
+import { EditIcon, ChevronDownIcon } from './Icons';
 import TaskItem from './TaskItem';
 import '../styles/DayGroup.css';
 
@@ -19,6 +18,9 @@ function DayGroup({
   onReorderTasks,
   onUpdateTask,
   onEditTime,
+  currentProject,
+  isDefaultProject,
+  currentUserEmail,
 }) {
   const [isExpanded, setIsExpanded] = useState(isToday(tasks[0].createdAt));
   const [isEditMode, setIsEditMode] = useState(false);
@@ -36,11 +38,6 @@ function DayGroup({
 
   const dateDisplay = formatDateDisplay(tasks[0].createdAt);
   const todayLabel = isToday(tasks[0].createdAt) ? ' (Hoje)' : '';
-
-  const handleDownloadLog = (e) => {
-    e.stopPropagation();
-    downloadLog(tasks, tasks[0].createdAt);
-  };
 
   const handleToggleEditMode = (e) => {
     e.stopPropagation();
@@ -140,6 +137,9 @@ function DayGroup({
         className={`day-header ${isExpanded ? 'expanded' : 'collapsed'}`}
         onClick={() => setIsExpanded(!isExpanded)}
       >
+        <span className={`day-toggle ${isExpanded ? 'open' : 'closed'}`}>
+          <ChevronDownIcon size={20} />
+        </span>
         <div className="day-header-content">
           <span className="day-date">
             {dateDisplay}
@@ -154,18 +154,8 @@ function DayGroup({
             >
               <EditIcon size={20} />
             </button>
-            <button
-              className="btn-download-log"
-              onClick={handleDownloadLog}
-              title="Baixar log do dia"
-            >
-              <DownloadIcon size={20} />
-            </button>
           </div>
         </div>
-        <span className={`day-toggle ${isExpanded ? 'open' : 'closed'}`}>
-          <ChevronDownIcon size={20} />
-        </span>
       </button>
 
       {isExpanded && (
@@ -192,6 +182,9 @@ function DayGroup({
               onDragLeave={handleDragLeave}
               onDrop={() => handleDrop(task.id)}
               onDragEnd={handleDragEnd}
+              isDefaultProject={isDefaultProject}
+              currentProject={currentProject}
+              currentUserEmail={currentUserEmail}
             />
           ))}
         </div>

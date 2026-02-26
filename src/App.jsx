@@ -1,10 +1,13 @@
 import { useState, useEffect, useRef } from 'react';
 import DayGroup from './components/DayGroup';
+import TaskItem from './components/TaskItem';
 import SettingsModal from './components/SettingsModal';
 import AuthModal from './components/AuthModal';
 import AuthGate from './components/AuthGate';
 import UserProfileModal from './components/UserProfileModal';
-import { SettingsIcon } from './components/Icons';
+import Sidebar from './components/Sidebar';
+import ProjectSettingsModal from './components/ProjectSettingsModal';
+import { SettingsIcon, MenuIcon } from './components/Icons';
 import { formatTime } from './utils/timeFormatter';
 import { saveTasks, loadTasks } from './utils/storage';
 import { groupTasksByDate, isToday } from './utils/dateGrouping';
@@ -12,7 +15,7 @@ import { DEFAULT_SETTINGS, loadSettings, saveSettings } from './utils/settings';
 import { roundSeconds } from './utils/rounding';
 import { requestNotificationPermission, notifyTaskReminder } from './utils/notifications';
 import { auth } from './utils/firebase';
-import { loadUserData, saveUserData } from './utils/firestore';
+import { loadUserData, saveUserData, saveSharedProject, loadSharedProjectsForUser, onSharedProjectTasksChange, onUserTasksChange, saveSharedProjectTasks } from './utils/firestore';
 import { onAuthStateChanged, sendEmailVerification } from 'firebase/auth';
 import './App.css';
 
@@ -33,13 +36,32 @@ function App() {
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [showEmailBanner, setShowEmailBanner] = useState(true);
   const [isResendingEmail, setIsResendingEmail] = useState(false);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [newSharedProjectNotification, setNewSharedProjectNotification] = useState(null);
+  const [projects, setProjects] = useState([{
+    id: 'default',
+    name: 'Minhas Tarefas',
+    description: '',
+    displayMode: 'LIST',
+    color: '#4adeb9',
+    members: [],
+    adminId: 'local_user',
+    adminEmail: 'Anonymous',
+  }]);
+  const [activeProjectId, setActiveProjectId] = useState('default');
+  const [isProjectSettingsOpen, setIsProjectSettingsOpen] = useState(false);
+  const [selectedProjectForSettings, setSelectedProjectForSettings] = useState(null);
   const inputRef = useRef(null);
   const lastNotificationRef = useRef({});
   const workHoursNotifiedRef = useRef({ lunch: null, exit: null }); // Track if already notified today
   const timerStartRef = useRef(null); // Track when timer started for timestamp-based counting
   const timerBaseDurationRef = useRef(0); // Track base duration when timer starts
   const isHydratingRef = useRef(false);
+  const unsubscribeUserTasksRef = useRef(null); // Real-time listener for user's personal tasks
+  const unsubscribeSharedProjectRef = useRef(null); // Real-time listener for shared project tasks
+  const isReceivingFromListenerRef = useRef(false); // Prevent sync loop when receiving from listener
   const authGateSeenKey = 'rupt_seen_auth_gate';
+  const seenSharedProjectsKey = 'rupt_seen_shared_projects'; // Track which shared projects user has seen notification for
 
   const mergeTasks = (localTasks, remoteTasks) => {
     const existingIds = new Set(remoteTasks.map((task) => task.id));
@@ -52,16 +74,86 @@ function App() {
     return merged;
   };
 
+  // Migrate tasks to add assignedTo field if missing (for backward compatibility)
+  const migrateTasksWithAssignee = (tasks, userEmail) => {
+    return tasks.map((task) => ({
+      ...task,
+      assignedTo: task.assignedTo || userEmail || 'Anonymous',
+    }));
+  };
+
   const mergeSettings = (localSettings, remoteSettings) => ({
     ...DEFAULT_SETTINGS,
     ...localSettings,
     ...(remoteSettings || {}),
   });
 
+  // Check for new shared projects and show notification
+  const checkForNewSharedProjects = (allProjects) => {
+    const seenProjects = JSON.parse(localStorage.getItem(seenSharedProjectsKey) || '[]');
+    
+    // Find first new shared project not yet seen
+    const newProject = allProjects.find(p => {
+      const isShared = p.members && p.members.length > 0 && p.id !== 'default';
+      const alreadySeen = seenProjects.includes(p.id);
+      return isShared && !alreadySeen;
+    });
+    
+    if (newProject) {
+      setNewSharedProjectNotification({
+        projectId: newProject.id,
+        projectName: newProject.name,
+      });
+    }
+  };
+
   // Load tasks from storage on mount
   useEffect(() => {
     const savedTasks = loadTasks();
     setTasks(savedTasks);
+  }, []);
+
+  // Load projects from storage on mount
+  useEffect(() => {
+    const savedProjects = localStorage.getItem('rupt_projects');
+    const savedActiveProjectId = localStorage.getItem('rupt_active_project');
+    
+    let projectsToSet = [];
+    
+    if (savedProjects) {
+      const parsed = JSON.parse(savedProjects);
+      // Migrate old projects to new schema
+      projectsToSet = parsed.map(p => ({
+        id: p.id,
+        name: p.name,
+        description: p.description || '',
+        displayMode: p.displayMode || 'LIST',
+        color: p.color || '#4adeb9',
+        members: p.members || [],
+        adminId: p.adminId || 'local_user',
+        adminEmail: p.adminEmail || 'Anonymous',
+      }));
+    } else {
+      // Initialize with default project
+      projectsToSet = [{
+        id: 'default',
+        name: 'Minhas Tarefas',
+        description: '',
+        displayMode: 'LIST',
+        color: '#4adeb9',
+        members: [],
+        adminId: 'local_user',
+        adminEmail: 'Anonymous',
+      }];
+      // Save to localStorage
+      localStorage.setItem('rupt_projects', JSON.stringify(projectsToSet));
+      localStorage.setItem('rupt_active_project', 'default');
+    }
+    
+    setProjects(projectsToSet);
+    if (savedActiveProjectId) {
+      setActiveProjectId(savedActiveProjectId);
+    }
   }, []);
 
   // Handle Firebase auth state
@@ -79,25 +171,92 @@ function App() {
         isHydratingRef.current = true;
         const localTasks = loadTasks();
         const localSettings = loadSettings();
+        const localProjects = JSON.parse(localStorage.getItem('rupt_projects') || '[{"id":"default","name":"Minhas Tarefas","description":"","displayMode":"LIST","color":"#4adeb9","members":[],"adminId":"local_user","adminEmail":"Anonymous"}]');
+        const localActiveProjectId = localStorage.getItem('rupt_active_project') || 'default';
         const remoteData = await loadUserData(currentUser.uid);
+
+        // Load shared projects where user is a member
+        const sharedProjects = await loadSharedProjectsForUser(currentUser.email);
 
         if (remoteData) {
           const mergedTasks = mergeTasks(localTasks, remoteData.tasks || []);
+          const migratedTasks = migrateTasksWithAssignee(mergedTasks, currentUser.email);
           const mergedSettings = mergeSettings(localSettings, remoteData.settings);
-          setTasks(mergedTasks);
+          
+          // Start with local projects as base (includes "Minhas Tarefas")
+          let allProjects = [...localProjects];
+          
+          // Merge with remote projects owned by this user
+          if (remoteData.projects && remoteData.projects.length > 0) {
+            remoteData.projects.forEach(remoteProject => {
+              const existingIndex = allProjects.findIndex(p => p.id === remoteProject.id);
+              if (existingIndex >= 0) {
+                // Update existing project
+                allProjects[existingIndex] = remoteProject;
+              } else if (remoteProject.id !== 'default') {
+                // Add new project (not default)
+                allProjects.push(remoteProject);
+              }
+            });
+          }
+          
+          // Add shared projects that aren't already in the list
+          sharedProjects.forEach(sharedProject => {
+            if (!allProjects.some(p => p.id === sharedProject.id)) {
+              allProjects.push(sharedProject);
+            }
+          });
+          
+          // Check for new shared projects and show notification
+          checkForNewSharedProjects(allProjects);
+          
+          const mergedActiveProjectId = remoteData.activeProjectId || localActiveProjectId;
+          setTasks(migratedTasks);
           setSettings(mergedSettings);
+          setProjects(allProjects);
+          setActiveProjectId(mergedActiveProjectId);
           setUserPhoto(remoteData.photoURL || null);
-          saveTasks(mergedTasks);
+          saveTasks(migratedTasks);
           saveSettings(mergedSettings);
+          localStorage.setItem('rupt_projects', JSON.stringify(allProjects));
+          localStorage.setItem('rupt_active_project', mergedActiveProjectId);
           await saveUserData(currentUser.uid, {
-            tasks: mergedTasks,
+            tasks: migratedTasks,
             settings: mergedSettings,
+            projects: allProjects,
+            activeProjectId: mergedActiveProjectId,
             photoURL: remoteData.photoURL,
           });
         } else {
+          // No remote data - first time login for this user
+          // Initialize with default project and any shared projects
+          const migratedLocalTasks = migrateTasksWithAssignee(localTasks, currentUser.email);
+          let allProjects = [...localProjects];
+          
+          console.log('First login - local projects:', localProjects);
+          console.log('Shared projects:', sharedProjects);
+          
+          sharedProjects.forEach(sharedProject => {
+            if (!allProjects.some(p => p.id === sharedProject.id)) {
+              allProjects.push(sharedProject);
+            }
+          });
+          
+          // Check for new shared projects and show notification
+          checkForNewSharedProjects(allProjects);
+          
+          setTasks(migratedLocalTasks);
+          setSettings(localSettings);
+          setProjects(allProjects);
+          setActiveProjectId(localActiveProjectId);
+          localStorage.setItem('rupt_projects', JSON.stringify(allProjects));
+          console.log('Setting projects on first login:', allProjects);
+          
           await saveUserData(currentUser.uid, {
-            tasks: localTasks,
+            tasks: migratedLocalTasks,
             settings: localSettings,
+            projects: allProjects,
+            activeProjectId: localActiveProjectId,
             photoURL: null,
           });
         }
@@ -121,6 +280,73 @@ function App() {
       setShowAuthGate(true);
     }
   }, [authLoading, user]);
+
+  // Setup real-time listeners for shared and personal projects
+  useEffect(() => {
+    if (!user || authLoading || isHydratingRef.current) return;
+
+    // Cleanup old listeners
+    if (unsubscribeUserTasksRef.current) {
+      unsubscribeUserTasksRef.current();
+      unsubscribeUserTasksRef.current = null;
+    }
+    if (unsubscribeSharedProjectRef.current) {
+      unsubscribeSharedProjectRef.current();
+      unsubscribeSharedProjectRef.current = null;
+    }
+
+    // Determine if current project is shared
+    const currentProject = projects.find(p => p.id === activeProjectId);
+    const isSharedProject = currentProject && currentProject.members && currentProject.members.length > 0;
+
+    if (isSharedProject && activeProjectId !== 'default') {
+      // Setup listener for shared project tasks
+      console.log('Setting up listener for shared project:', activeProjectId);
+      unsubscribeSharedProjectRef.current = onSharedProjectTasksChange(activeProjectId, (sharedProjectTasks) => {
+        // Merge: replace tasks for this project, keep all other project tasks
+        setTasks((prevTasks) => {
+          const otherProjectTasks = prevTasks.filter(t => t.projectId !== activeProjectId);
+          const merged = [...sharedProjectTasks, ...otherProjectTasks];
+          console.log(`Merged tasks for shared project ${activeProjectId}: ${merged.length} total`);
+          isReceivingFromListenerRef.current = true;
+          setTimeout(() => { isReceivingFromListenerRef.current = false; }, 100);
+          return merged;
+        });
+      });
+    } else {
+      // Setup listener for personal user tasks
+      console.log('Setting up listener for user personal tasks');
+      unsubscribeUserTasksRef.current = onUserTasksChange(user.uid, (personalTasks) => {
+        // Only update if not actively hydrating
+        if (!isHydratingRef.current) {
+          // Merge: replace personal project tasks, keep shared project tasks
+          setTasks((prevTasks) => {
+            const sharedProjectTasks = prevTasks.filter(t => {
+              const proj = projects.find(p => p.id === t.projectId);
+              return proj && proj.members && proj.members.length > 0;
+            });
+            const merged = [...personalTasks, ...sharedProjectTasks];
+            console.log(`Merged personal tasks: ${merged.length} total (${personalTasks.length} personal + ${sharedProjectTasks.length} shared)`);
+            isReceivingFromListenerRef.current = true;
+            setTimeout(() => { isReceivingFromListenerRef.current = false; }, 100);
+            return merged;
+          });
+        }
+      });
+    }
+
+    // Cleanup on unmount
+    return () => {
+      if (unsubscribeUserTasksRef.current) {
+        unsubscribeUserTasksRef.current();
+        unsubscribeUserTasksRef.current = null;
+      }
+      if (unsubscribeSharedProjectRef.current) {
+        unsubscribeSharedProjectRef.current();
+        unsubscribeSharedProjectRef.current = null;
+      }
+    };
+  }, [user, activeProjectId, projects, authLoading]);
 
   // Save tasks to storage whenever they change
   useEffect(() => {
@@ -285,10 +511,140 @@ function App() {
 
   const syncToFirestore = async (tasksToSync, settingsToSync) => {
     if (!user) return;
-    await saveUserData(user.uid, {
-      tasks: tasksToSync,
-      settings: settingsToSync,
-    });
+    
+    // Determine if current project is shared
+    const currentProject = projects.find(p => p.id === activeProjectId);
+    const isSharedProject = currentProject && currentProject.members && currentProject.members.length > 0;
+    
+    console.log('syncToFirestore - activeProjectId:', activeProjectId, 'isSharedProject:', isSharedProject, 'currentProject:', currentProject);
+    
+    try {
+      // Save to user's personal data
+      await saveUserData(user.uid, {
+        tasks: tasksToSync,
+        settings: settingsToSync,
+        projects,
+        activeProjectId,
+      });
+      
+      // If viewing a shared project, also save tasks there (only tasks for this project)
+      if (isSharedProject && activeProjectId !== 'default') {
+        const projectTasks = tasksToSync.filter(t => t.projectId === activeProjectId);
+        console.log(`Saving ${projectTasks.length} tasks to shared project ${activeProjectId}`);
+        await saveSharedProjectTasks(activeProjectId, projectTasks);
+      }
+    } catch (error) {
+      console.error('Error syncing to Firestore:', error);
+    }
+  };
+
+  // Project management handlers
+  const handleSelectProject = (projectId) => {
+    setActiveProjectId(projectId);
+    setIsSidebarOpen(false);
+  };
+
+  const handleCreateProject = (projectName) => {
+    const newProject = {
+      id: `project_${Date.now()}`,
+      name: projectName,
+      description: '',
+      displayMode: 'LIST',
+      color: '#4adeb9',
+      members: [],
+      adminId: user?.uid || 'local_user',
+      adminEmail: user?.email || 'Anonymous',
+    };
+    const updatedProjects = [...projects, newProject];
+    setProjects(updatedProjects);
+    setActiveProjectId(newProject.id);
+    localStorage.setItem('rupt_projects', JSON.stringify(updatedProjects));
+    localStorage.setItem('rupt_active_project', newProject.id);
+    if (user) {
+      saveUserData(user.uid, {
+        tasks,
+        settings,
+        projects: updatedProjects,
+        activeProjectId: newProject.id,
+      });
+    }
+  };
+
+  const handleOpenProjectSettings = (projectId) => {
+    const project = projects.find(p => p.id === projectId);
+    setSelectedProjectForSettings(project);
+    setIsProjectSettingsOpen(true);
+  };
+
+  const handleUpdateProject = async (updatedProject) => {
+    console.log('Updating project:', updatedProject);
+    const updatedProjects = projects.map(p => 
+      p.id === updatedProject.id ? updatedProject : p
+    );
+    setProjects(updatedProjects);
+    localStorage.setItem('rupt_projects', JSON.stringify(updatedProjects));
+    
+    // If project has members, save it as a shared project in Firestore
+    if (updatedProject.members && updatedProject.members.length > 0) {
+      console.log('Saving shared project with members:', updatedProject.members);
+      await saveSharedProject(updatedProject);
+    }
+    
+    if (user) {
+      console.log('Syncing to Firestore for user:', user.uid);
+      saveUserData(user.uid, {
+        tasks,
+        settings,
+        projects: updatedProjects,
+        activeProjectId,
+      });
+    }
+  };
+
+  const handleDeleteProjectFromSettings = (projectId) => {
+    // Don't allow deleting the default project
+    if (projectId === 'default') return;
+
+    // Delete all tasks from this project
+    const updatedTasks = tasks.filter((task) => task.projectId !== projectId);
+    setTasks(updatedTasks);
+    saveTasks(updatedTasks);
+
+    // Remove project from list
+    const updatedProjects = projects.filter((p) => p.id !== projectId);
+    setProjects(updatedProjects);
+    localStorage.setItem('rupt_projects', JSON.stringify(updatedProjects));
+
+    // If deleting active project, switch to default
+    if (activeProjectId === projectId) {
+      setActiveProjectId('default');
+      localStorage.setItem('rupt_active_project', 'default');
+    }
+
+    if (user) {
+      saveUserData(user.uid, {
+        tasks: updatedTasks,
+        settings,
+        projects: updatedProjects,
+        activeProjectId: activeProjectId === projectId ? 'default' : activeProjectId,
+      });
+    }
+  };
+
+  const handleRenameProject = (projectId, newName) => {
+    const updatedProjects = projects.map((p) =>
+      p.id === projectId ? { ...p, name: newName } : p
+    );
+    setProjects(updatedProjects);
+    localStorage.setItem('rupt_projects', JSON.stringify(updatedProjects));
+    if (user) {
+      saveUserData(user.uid, {
+        tasks,
+        settings,
+        projects: updatedProjects,
+        activeProjectId,
+      });
+    }
   };
 
   const createTask = (e) => {
@@ -333,6 +689,13 @@ function App() {
   };
 
   const createTaskWithData = (description, details, requester) => {
+    const currentProject = projects.find(p => p.id === activeProjectId);
+    const isDefaultProject = activeProjectId === 'default';
+    
+    // Always assign task to current user when creating
+    // Task starts running automatically (as it does today)
+    const assignedToEmail = user?.email || 'Anonymous';
+    
     const newTask = {
       id: Date.now(),
       description: description,
@@ -341,9 +704,11 @@ function App() {
       createdAt: new Date().toISOString(),
       startedAt: new Date().toISOString(),
       totalDurationSeconds: 0,
-      status: 'running',
+      status: 'running', // Always starts running when created
       isUrgent: false,
-      customOrderDate: null, // Tracks when manual ordering started for this day
+      customOrderDate: null,
+      projectId: activeProjectId,
+      assignedTo: assignedToEmail, // Task assigned to creator (current user)
     };
 
     setTasks((prevTasks) => {
@@ -543,11 +908,19 @@ function App() {
     syncToFirestore(reorderedTasks, settings);
   };
 
-  const handleSaveSettings = (newSettings) => {
+  const handleSaveSettings = (newSettings, newTasks = []) => {
+    // Merge new tasks if any
+    let updatedTasks = tasks;
+    if (newTasks.length > 0) {
+      updatedTasks = [...tasks, ...newTasks];
+      setTasks(updatedTasks);
+      saveTasks(updatedTasks);
+    }
+    
     setSettings(newSettings);
     saveSettings(newSettings);
     // Sync settings to Firestore
-    syncToFirestore(tasks, newSettings);
+    syncToFirestore(updatedTasks, newSettings);
   };
 
   const handleOpenAuth = () => {
@@ -585,6 +958,23 @@ function App() {
     setShowEmailBanner(false);
   };
 
+  const handleDismissSharedProjectNotification = () => {
+    if (newSharedProjectNotification) {
+      // Mark this project as seen
+      const seenProjects = JSON.parse(localStorage.getItem(seenSharedProjectsKey) || '[]');
+      seenProjects.push(newSharedProjectNotification.projectId);
+      localStorage.setItem(seenSharedProjectsKey, JSON.stringify(seenProjects));
+      setNewSharedProjectNotification(null);
+    }
+  };
+
+  const handleOpenSharedProject = () => {
+    if (newSharedProjectNotification) {
+      handleSelectProject(newSharedProjectNotification.projectId);
+      handleDismissSharedProjectNotification();
+    }
+  };
+
   const handleReloadUser = async () => {
     if (user) {
       await user.reload();
@@ -598,8 +988,19 @@ function App() {
     0
   );
 
+  // Filter tasks by active project
+  const filteredTasks = tasks.filter((task) => {
+    // Tasks created before the project system should default to 'default' project
+    const taskProjectId = task.projectId || 'default';
+    return taskProjectId === activeProjectId;
+  });
+
+  // Get active project for display mode
+  const activeProject = projects.find(p => p.id === activeProjectId);
+  const displayMode = activeProject?.displayMode || 'LIST';
+
   // Group tasks by date
-  const groupedTasks = groupTasksByDate(tasks);
+  const groupedTasks = groupTasksByDate(filteredTasks);
   
   // Sort tasks within each day with smart ordering
   const sortedGroupedTasks = Object.keys(groupedTasks).reduce((acc, dateKey) => {
@@ -626,11 +1027,48 @@ function App() {
     
     return acc;
   }, {});
+
+  // For BLOCKS mode, sort all tasks together instead of grouping by date
+  const sortedBlocksTasks = (() => {
+    if (displayMode === 'BLOCKS') {
+      // 1. Running tasks (top)
+      const runningTasks = filteredTasks.filter(task => task.status === 'running');
+      
+      // 2. Urgent tasks
+      const urgentTasks = filteredTasks.filter(
+        task => task.status !== 'running' && task.status !== 'completed' && task.isUrgent
+      );
+      
+      // 3. Normal/Paused tasks
+      const normalTasks = filteredTasks.filter(
+        task => task.status !== 'running' && task.status !== 'completed' && !task.isUrgent
+      );
+      
+      // 4. Completed tasks (bottom)
+      const completedTasks = filteredTasks.filter(task => task.status === 'completed');
+      
+      return [...runningTasks, ...urgentTasks, ...normalTasks, ...completedTasks];
+    }
+    return [];
+  })();
+  
   
   const dateKeys = Object.keys(sortedGroupedTasks);
+  const currentProject = projects.find(p => p.id === activeProjectId);
+  const projectColor = currentProject?.color || '#4adeb9';
 
   return (
-    <div className="app-container">
+    <div className="app-container" style={{ '--projectColor': projectColor }}>
+      <Sidebar
+        isOpen={isSidebarOpen}
+        onClose={() => setIsSidebarOpen(false)}
+        projects={projects}
+        activeProjectId={activeProjectId}
+        onSelectProject={handleSelectProject}
+        onCreateProject={handleCreateProject}
+        onRenameProject={handleRenameProject}
+        onOpenProjectSettings={handleOpenProjectSettings}
+      />
       <AuthGate
         isOpen={showAuthGate}
         onUseWithoutLogin={handleUseWithoutLogin}
@@ -638,6 +1076,13 @@ function App() {
       />
       <header className="app-header">
         <div className="header-content">
+          <button 
+            className="btn-menu" 
+            onClick={() => setIsSidebarOpen(true)}
+            title="Menu de Projetos"
+          >
+            <MenuIcon size={20} />
+          </button>
           <img src="/rupt-logo.png" alt="Rupt" className="app-logo" />
           <div className="total-time">
             <span className="label">Hoje:</span>
@@ -712,6 +1157,41 @@ function App() {
         </div>
       )}
 
+      {newSharedProjectNotification && (
+        <div className="shared-project-notification-banner">
+          <div className="banner-content">
+            <span className="banner-icon">👥</span>
+            <div className="banner-text">
+              <strong>Você foi adicionado a um novo projeto</strong>
+              <span>{newSharedProjectNotification.projectName}</span>
+            </div>
+            <div className="banner-actions">
+              <button 
+                className="banner-btn-primary" 
+                onClick={handleOpenSharedProject}
+              >
+                Abrir Projeto
+              </button>
+              <button className="banner-btn-close" onClick={handleDismissSharedProjectNotification} title="Fechar">
+                ✕
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Project Header */}
+      {projects.find(p => p.id === activeProjectId)?.id !== 'default' && projects.find(p => p.id === activeProjectId) && (
+        <div className="project-header">
+          <div className="project-header-content">
+            <h1 className="project-name">{projects.find(p => p.id === activeProjectId)?.name}</h1>
+            {projects.find(p => p.id === activeProjectId)?.description && (
+              <p className="project-description">{projects.find(p => p.id === activeProjectId)?.description}</p>
+            )}
+          </div>
+        </div>
+      )}
+
       <main className="app-main">
         <form className="task-input-form" onSubmit={createTask}>
           {step === 'description' ? (
@@ -772,28 +1252,75 @@ function App() {
         </form>
 
         <div className="tasks-list">
-          {dateKeys.length === 0 ? (
-            <div className="empty-state">
-              <p>Nenhuma tarefa ainda. Crie uma para começar!</p>
-            </div>
+          {displayMode === 'BLOCKS' ? (
+            // BLOCKS MODE: Simple grid layout without day grouping
+            sortedBlocksTasks.length === 0 ? (
+              <div className="empty-state">
+                <p>Nenhuma tarefa no projeto. Crie uma para começar!</p>
+              </div>
+            ) : (
+              <div className="tasks-blocks-grid">
+                {sortedBlocksTasks.map((task) => (
+                  <TaskItem
+                    key={task.id}
+                    task={task}
+                    isRunning={runningTaskId === task.id}
+                    elapsedSeconds={0}
+                    onStart={() => startTask(task.id)}
+                    onPause={() => pauseTask(task.id)}
+                    onComplete={() => completeTask(task.id)}
+                    onToggleUrgent={() => toggleUrgent(task.id)}
+                    onReopen={() => reopenTask(task.id)}
+                    isEditMode={false}
+                    onDelete={() => deleteTask(task.id)}
+                    onUpdateTask={updateTask}
+                    onEditTime={editTaskTime}
+                    isDragging={false}
+                    isDragOver={false}
+                    onDragStart={() => {}}
+                    onDragOver={() => {}}
+                    onDragLeave={() => {}}
+                    onDrop={() => {}}
+                    onDragEnd={() => {}}
+                    isDefaultProject={activeProjectId === 'default'}
+                    currentProject={activeProject}
+                    currentUserEmail={user?.email || 'Anonymous'}
+                  />
+                ))}
+              </div>
+            )
           ) : (
-            dateKeys.map((dateKey) => (
-              <DayGroup
-                key={dateKey}
-                dateKey={dateKey}
-                tasks={sortedGroupedTasks[dateKey]}
-                runningTaskId={runningTaskId}
-                onStart={startTask}
-                onPause={pauseTask}
-                onComplete={completeTask}
-                onToggleUrgent={toggleUrgent}
-                onReopen={reopenTask}
-                onDelete={deleteTask}
-                onReorderTasks={reorderTasks}
-                onUpdateTask={updateTask}
-                onEditTime={editTaskTime}
-              />
-            ))
+            // LIST MODE: Grouped by date (original behavior)
+            dateKeys.length === 0 ? (
+              <div className="empty-state">
+                <p>Nenhuma tarefa ainda. Crie uma para começar!</p>
+              </div>
+            ) : (
+              dateKeys.map((dateKey) => {
+                const currentProject = projects.find(p => p.id === activeProjectId);
+                const isDefaultProject = activeProjectId === 'default';
+                return (
+                  <DayGroup
+                    key={dateKey}
+                    dateKey={dateKey}
+                    tasks={sortedGroupedTasks[dateKey]}
+                    runningTaskId={runningTaskId}
+                    onStart={startTask}
+                    onPause={pauseTask}
+                    onComplete={completeTask}
+                    onToggleUrgent={toggleUrgent}
+                    onReopen={reopenTask}
+                    onDelete={deleteTask}
+                    onReorderTasks={reorderTasks}
+                    onUpdateTask={updateTask}
+                    onEditTime={editTaskTime}
+                    currentProject={currentProject}
+                    isDefaultProject={isDefaultProject}
+                    currentUserEmail={user?.email || 'Anonymous'}
+                  />
+                );
+              })
+            )
           )}
         </div>
       </main>
@@ -814,6 +1341,15 @@ function App() {
         onSave={handleSaveSettings}
         allTasks={tasks}
         isLoggedIn={!!user}
+      />
+
+      <ProjectSettingsModal
+        isOpen={isProjectSettingsOpen}
+        onClose={() => setIsProjectSettingsOpen(false)}
+        project={selectedProjectForSettings}
+        currentUserId={user?.uid || 'local_user'}
+        onUpdate={handleUpdateProject}
+        onDelete={handleDeleteProjectFromSettings}
       />
 
       <AuthModal

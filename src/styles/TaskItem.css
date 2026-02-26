@@ -59,7 +59,7 @@
 
 .task-item.drag-over {
   transform: translateY(6px);
-  border-color: #4adeb9;
+  border-color: var(--projectColor);
   background-color: #1a3a2a;
   margin-bottom: 1.25rem;
   box-shadow: inset 0 0 8px rgba(74, 222, 185, 0.2), 0 4px 12px rgba(74, 222, 185, 0.3);
@@ -70,7 +70,7 @@
 }
 
 .task-item.running {
-  border-color: #4adeb9;
+  border-color: var(--projectColor);
   background-color: #1a2a1a;
   box-shadow: 0 0 15px rgba(74, 222, 185, 0.3);
   animation: subtleGlow 2s ease-in-out infinite;
@@ -157,7 +157,7 @@
 
 .task-edit-input {
   background-color: #1a1a1a;
-  border: 2px solid #4adeb9;
+  border: 2px solid var(--projectColor);
   border-radius: 4px;
   color: #e5e5e5;
   padding: 4px 8px;
@@ -175,7 +175,7 @@
 .task-edit-input.time-input {
   font-family: 'Courier New', monospace;
   font-size: 0.85rem;
-  color: #4adeb9;
+  color: var(--projectColor);
   text-align: right;
   min-width: 80px;
   width: 100px;
@@ -234,6 +234,38 @@
   font-weight: 500;
 }
 
+.task-assigned-to {
+  display: flex;
+  align-items: center;
+  margin-left: 1rem;
+}
+
+.task-assigned-to.editable {
+  cursor: text;
+}
+
+.task-assigned-to.editable:hover {
+  background-color: rgba(74, 222, 185, 0.05);
+  border-radius: 4px;
+  padding: 2px 4px;
+  margin: -2px -4px;
+}
+
+.assigned-to-name {
+  color: #7acd7a;
+  font-weight: 500;
+}
+
+.task-edit-select {
+  background-color: #3a3a3a;
+  color: #e0e0e0;
+  border: 1px solid #4ab2de;
+  border-radius: 4px;
+  padding: 4px 8px;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
 .task-item.completed .task-description {
   text-decoration: line-through;
   color: #888;
@@ -242,7 +274,7 @@
 .task-time {
   font-family: 'Courier New', monospace;
   font-size: 0.85rem;
-  color: #4adeb9;
+  color: var(--projectColor);
   font-weight: 500;
   min-width: 60px;
   text-align: right;
@@ -284,7 +316,7 @@
 }
 
 .btn-start {
-  background-color: #4adeb9;
+  background-color: var(--projectColor);
   color: #fff;
 }
 
@@ -349,7 +381,7 @@
   align-items: center;
   gap: 0.25rem;
   padding: 0.6rem 0.8rem;
-  background-color: #4adeb9;
+  background-color: var(--projectColor);
   color: #fff;
   border-radius: 6px;
   font-size: 0.85rem;
@@ -434,4 +466,59 @@
   .btn {
     flex: 1;
   }
+}
+
+/* BLOCKS MODE - Card layout */
+.tasks-blocks-grid .task-item {
+  flex-direction: row;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.tasks-blocks-grid .drag-handle {
+  display: none;
+}
+
+.tasks-blocks-grid .btn-delete-task {
+  display: none;
+}
+
+.tasks-blocks-grid .task-content {
+  flex: 1;
+  flex-direction: column;
+  justify-content: flex-start;
+  align-items: stretch;
+  gap: 0.75rem;
+  margin-left: 0.5rem;
+}
+
+.tasks-blocks-grid .task-info {
+  gap: 0.5rem;
+}
+
+.tasks-blocks-grid .task-time {
+  align-self: flex-start;
+  margin-top: 0;
+}
+
+.tasks-blocks-grid .task-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-left: 0;
+  flex-shrink: 0;
+  align-items: center;
+}
+
+.tasks-blocks-grid .btn {
+  padding: 0.4rem;
+  min-width: 32px;
+  min-height: 32px;
+  font-size: 1rem;
+}
+
+.tasks-blocks-grid .status-badge {
+  font-size: 0.75rem;
+  padding: 0.4rem 0.6rem;
 }

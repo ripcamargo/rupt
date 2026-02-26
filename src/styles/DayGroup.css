@@ -105,6 +105,8 @@
   color: #888;
   font-size: 0.8rem;
   transition: transform 0.2s ease;
+  margin-right: 0.75rem;
+  flex-shrink: 0;
 }
 
 .day-toggle.open {

@@ -23,6 +23,9 @@ function TaskItem({
   onDragLeave,
   onDrop,
   onDragEnd,
+  isDefaultProject,
+  currentProject,
+  currentUserEmail,
 }) {
   const [editingField, setEditingField] = useState(null);
   const [editValue, setEditValue] = useState('');
@@ -176,6 +179,34 @@ function TaskItem({
                   ) : (
                     isEditMode && <span className="placeholder-text">Clique duas vezes para adicionar solicitante</span>
                   )
+                )}
+              </span>
+            )}
+            {!isDefaultProject && (
+              <span 
+                className={`task-assigned-to ${isEditMode ? 'editable' : ''}`}
+                onDoubleClick={() => handleDoubleClick('assignedTo', task.assignedTo || currentUserEmail)}
+              >
+                {editingField === 'assignedTo' ? (
+                  <select
+                    value={editValue}
+                    onChange={(e) => setEditValue(e.target.value)}
+                    onBlur={handleEditBlur}
+                    onKeyDown={handleEditKeyDown}
+                    autoFocus
+                    className="task-edit-select"
+                  >
+                    <option value={currentUserEmail}>Eu ({currentUserEmail?.split('@')[0]})</option>
+                    {currentProject?.members?.filter(m => m.email !== currentUserEmail).map((member) => (
+                      <option key={member.email} value={member.email}>
+                        {member.email?.split('@')[0]}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <span className="assigned-to-name">
+                    Responsável: {(task.assignedTo || currentUserEmail) === currentUserEmail ? 'Eu' : (task.assignedTo || currentUserEmail)?.split('@')[0]}
+                  </span>
                 )}
               </span>
             )}
