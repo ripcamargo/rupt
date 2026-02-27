@@ -21,6 +21,7 @@ function DayGroup({
   currentProject,
   isDefaultProject,
   currentUserEmail,
+  displayMode = 'LIST',
 }) {
   const [isExpanded, setIsExpanded] = useState(isToday(tasks[0].createdAt));
   const [isEditMode, setIsEditMode] = useState(false);
@@ -159,7 +160,7 @@ function DayGroup({
       </button>
 
       {isExpanded && (
-        <div className="day-tasks">
+        <div className={displayMode === 'BLOCKS' ? 'tasks-blocks-grid' : 'day-tasks'}>
           {sortedTasks.map((task) => (
             <TaskItem
               key={task.id}

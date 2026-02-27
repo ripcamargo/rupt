@@ -2,16 +2,18 @@ import { useState, useEffect } from 'react';
 import { CloseIcon, SettingsIcon } from './Icons';
 import '../styles/ProjectSettingsModal.css';
 
-function ProjectSettingsModal({ isOpen, onClose, project, currentUserId, user, onOpenAuth, onUpdate, onDelete }) {
+function ProjectSettingsModal({ isOpen, onClose, project, currentUserId, user, onOpenAuth, onUpdate, onDelete, onLeaveProject }) {
   const [formData, setFormData] = useState({
     name: '',
     description: '',
     displayMode: 'LIST',
     color: '#4adeb9',
+    groupByDay: true,
   });
   const [members, setMembers] = useState([]);
   const [newMemberEmail, setNewMemberEmail] = useState('');
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
 
   useEffect(() => {
     if (project && isOpen) {
@@ -20,6 +22,7 @@ function ProjectSettingsModal({ isOpen, onClose, project, currentUserId, user, o
         description: project.description || '',
         displayMode: project.displayMode || 'LIST',
         color: project.color || '#4adeb9',
+        groupByDay: project.groupByDay !== undefined ? project.groupByDay : true,
       });
       setMembers(project.members || []);
       setNewMemberEmail('');
@@ -28,13 +31,14 @@ function ProjectSettingsModal({ isOpen, onClose, project, currentUserId, user, o
 
   const isAdmin = currentUserId === project?.adminId;
   const isDefaultProject = project?.id === 'default';
+  const isMember = user && project?.members?.some(m => m.email === user.email);
   const canEdit = isAdmin || isDefaultProject;
 
   const handleChange = (e) => {
-    const { name, value } = e.target;
+    const { name, value, type, checked } = e.target;
     setFormData(prev => ({
       ...prev,
-      [name]: value,
+      [name]: type === 'checkbox' ? checked : value,
     }));
   };
 
@@ -67,6 +71,7 @@ function ProjectSettingsModal({ isOpen, onClose, project, currentUserId, user, o
         ...project,
         displayMode: formData.displayMode,
         color: formData.color,
+        groupByDay: formData.groupByDay,
       });
       onClose();
       return;
@@ -88,6 +93,11 @@ function ProjectSettingsModal({ isOpen, onClose, project, currentUserId, user, o
     }
   };
 
+  const handleLeaveProject = () => {
+    onLeaveProject(project.id);
+    onClose();
+  };
+
   if (!isOpen || !project) return null;
 
   return (
@@ -103,46 +113,41 @@ function ProjectSettingsModal({ isOpen, onClose, project, currentUserId, user, o
           </button>
         </div>
 
-        <div className="modal-content">
-          {canEdit ? (
-            <form onSubmit={handleSave} className="project-settings-form">
+        {canEdit ? (
+          <form onSubmit={handleSave} className="project-settings-form">
               {/* Basic Info */}
-              <div className="form-section">
-                <h3>Informações Básicas</h3>
-                
-                <div className="form-group">
-                  <label htmlFor="project-name">Nome do Projeto *</label>
-                  <input
-                    id="project-name"
-                    type="text"
-                    name="name"
-                    value={formData.name}
-                    onChange={handleChange}
-                    required
-                    className="form-input"
-                    disabled={!isAdmin || isDefaultProject}
-                  />
-                </div>
+              {!isDefaultProject && (
+                <div className="form-section">
+                  <h3>Informações Básicas</h3>
+                  
+                  <div className="form-group">
+                    <label htmlFor="project-name">Nome do Projeto *</label>
+                    <input
+                      id="project-name"
+                      type="text"
+                      name="name"
+                      value={formData.name}
+                      onChange={handleChange}
+                      required
+                      className="form-input"
+                      disabled={!isAdmin || isDefaultProject}
+                    />
+                  </div>
 
-                <div className="form-group">
-                  <label htmlFor="project-description">Descrição (Opcional)</label>
-                  <textarea
-                    id="project-description"
-                    name="description"
-                    value={formData.description}
-                    onChange={handleChange}
-                    className="form-textarea"
-                    placeholder="Descreva o propósito deste projeto..."
-                    disabled={!isAdmin || isDefaultProject}
-                  />
+                  <div className="form-group">
+                    <label htmlFor="project-description">Descrição (Opcional)</label>
+                    <textarea
+                      id="project-description"
+                      name="description"
+                      value={formData.description}
+                      onChange={handleChange}
+                      className="form-textarea"
+                      placeholder="Descreva o propósito deste projeto..."
+                      disabled={!isAdmin || isDefaultProject}
+                    />
+                  </div>
                 </div>
-
-                {isDefaultProject && (
-                  <p className="default-project-note">
-                    Este projeto e seu HOME. Aqui voce pode ajustar apenas cor e modo de exibicao.
-                  </p>
-                )}
-              </div>
+              )}
 
               {/* Display Settings */}
               <div className="form-section">
@@ -177,16 +182,21 @@ function ProjectSettingsModal({ isOpen, onClose, project, currentUserId, user, o
                         disabled={!canEdit}
                       />
                       <span className="color-value">{formData.color}</span>
-                      <button
-                        type="button"
-                        className="btn-reset-color"
-                        onClick={() => setFormData(prev => ({ ...prev, color: '#4adeb9' }))}
-                        disabled={!canEdit}
-                      >
-                        Padrão
-                      </button>
                     </div>
                   </div>
+                </div>
+
+                <div className="form-group">
+                  <label className="checkbox-label">
+                    <input
+                      type="checkbox"
+                      name="groupByDay"
+                      checked={formData.groupByDay}
+                      onChange={handleChange}
+                      disabled={!canEdit}
+                    />
+                      Agrupar tarefas por dia
+                  </label>
                 </div>
               </div>
 
@@ -274,8 +284,8 @@ function ProjectSettingsModal({ isOpen, onClose, project, currentUserId, user, o
                 )}
               </div>
             </form>
-          ) : (
-            <div className="viewer-mode">
+        ) : (
+          <div className="viewer-mode">
               <div className="form-section">
                 <h3>Informações do Projeto</h3>
                 
@@ -324,9 +334,50 @@ function ProjectSettingsModal({ isOpen, onClose, project, currentUserId, user, o
                   ))}
                 </div>
               </div>
+
+              {/* Leave Project Button for Members */}
+              {!isAdmin && isMember && !isDefaultProject && (
+                <div className="form-section form-actions">
+                  <button
+                    type="button"
+                    className="btn-leave-project"
+                    onClick={() => setShowLeaveConfirm(true)}
+                  >
+                    Sair do Projeto
+                  </button>
+                </div>
+              )}
             </div>
-          )}
-        </div>
+        )}
+
+        {showLeaveConfirm && isMember && !isAdmin && (
+          <div className="delete-confirmation">
+            <div className="confirmation-content">
+              <h4>Sair do Projeto</h4>
+              <p>
+                Você tem certeza que deseja sair do projeto "<strong>{project.name}</strong>"?
+              </p>
+              <p>
+                Você perderá acesso a todas as tarefas e informações deste projeto.
+                Se precisar acessá-lo novamente, será necessário um novo convite do administrador.
+              </p>
+              <div className="confirmation-actions">
+                <button
+                  className="btn-confirm-leave"
+                  onClick={handleLeaveProject}
+                >
+                  Sim, Sair do Projeto
+                </button>
+                <button
+                  className="btn-cancel-delete"
+                  onClick={() => setShowLeaveConfirm(false)}
+                >
+                  Cancelar
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {showDeleteConfirm && isAdmin && (
           <div className="delete-confirmation">

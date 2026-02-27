@@ -43,28 +43,6 @@
   cursor: pointer;
 }
 
-.profile-tabs {
-  display: flex;
-  border-bottom: 1px solid #2a2a2a;
-}
-
-.profile-tab {
-  flex: 1;
-  padding: 1rem;
-  background: transparent;
-  border: none;
-  color: #888;
-  cursor: pointer;
-  font-weight: 500;
-  transition: all 0.2s ease;
-  border-bottom: 2px solid transparent;
-}
-
-.profile-tab.active {
-  color: #4adeb9;
-  border-bottom-color: #4adeb9;
-}
-
 .profile-form {
   flex: 1;
   overflow-y: auto;
@@ -188,6 +166,29 @@
   opacity: 0.7;
   cursor: not-allowed;
   transform: none;
+}
+
+.profile-section-title {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+  color: #e5e5e5;
+  margin-top: 1rem;
+  margin-bottom: 1rem;
+}
+
+.profile-divider {
+  height: 1px;
+  background: #2a2a2a;
+  margin: 1.5rem 0;
+}
+
+.profile-password-button {
+  background: #ff9d1d;
+}
+
+.profile-password-button:hover {
+  background: #ffaa33;
 }
 
 .profile-footer {

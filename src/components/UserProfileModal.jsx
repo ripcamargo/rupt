@@ -14,11 +14,23 @@ function UserProfileModal({ isOpen, onClose, user, userPhoto }) {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [activeTab, setActiveTab] = useState('profile');
 
   useEffect(() => {
     setPhotoBase64(userPhoto || '');
   }, [userPhoto]);
+
+  useEffect(() => {
+    if (isOpen && user) {
+      // Reset state when modal opens
+      setDisplayName(user.displayName || '');
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+      setPhotoBase64(userPhoto || '');
+      setError('');
+      setSuccess('');
+    }
+  }, [isOpen, user, userPhoto]);
 
   if (!isOpen || !user) return null;
 
@@ -34,7 +46,6 @@ function UserProfileModal({ isOpen, onClose, user, userPhoto }) {
     setCurrentPassword('');
     setNewPassword('');
     setConfirmPassword('');
-    setActiveTab('profile');
     onClose();
   };
 
@@ -152,107 +163,93 @@ function UserProfileModal({ isOpen, onClose, user, userPhoto }) {
           </button>
         </div>
 
-        <div className="profile-tabs">
-          <button
-            className={`profile-tab ${activeTab === 'profile' ? 'active' : ''}`}
-            onClick={() => {
-              setActiveTab('profile');
-              resetMessages();
-            }}
+        <form className="profile-form">
+          <h3 className="profile-section-title">Dados Pessoais</h3>
+          
+          <div className="profile-photo-section">
+            {photoBase64 ? (
+              <img src={photoBase64} alt="Usuario" className="profile-photo" />
+            ) : (
+              <div className="profile-photo-placeholder">
+                {(user.displayName || user.email || 'U').charAt(0).toUpperCase()}
+              </div>
+            )}
+            <label className="profile-photo-input">
+              <input type="file" accept="image/*" onChange={handlePhotoChange} />
+              Alterar foto
+            </label>
+          </div>
+
+          <label className="profile-field">
+            <span>Nome</span>
+            <input
+              type="text"
+              value={displayName}
+              onChange={(e) => setDisplayName(e.target.value)}
+              placeholder="Seu nome"
+            />
+          </label>
+
+          <label className="profile-field">
+            <span>Email</span>
+            <input type="email" value={user.email} disabled />
+          </label>
+
+          <button 
+            type="button" 
+            className="profile-submit" 
+            onClick={handleUpdateProfile}
+            disabled={isSubmitting}
           >
-            Dados
+            {isSubmitting ? 'Salvando...' : 'Salvar Dados'}
           </button>
-          <button
-            className={`profile-tab ${activeTab === 'password' ? 'active' : ''}`}
-            onClick={() => {
-              setActiveTab('password');
-              resetMessages();
-            }}
+
+          <div className="profile-divider"></div>
+
+          <h3 className="profile-section-title">Alterar Senha</h3>
+
+          <label className="profile-field">
+            <span>Senha atual</span>
+            <input
+              type="password"
+              value={currentPassword}
+              onChange={(e) => setCurrentPassword(e.target.value)}
+              placeholder="Sua senha atual"
+            />
+          </label>
+
+          <label className="profile-field">
+            <span>Nova senha</span>
+            <input
+              type="password"
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.target.value)}
+              placeholder="Minimo 6 caracteres"
+            />
+          </label>
+
+          <label className="profile-field">
+            <span>Confirmar nova senha</span>
+            <input
+              type="password"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              placeholder="Confirme a nova senha"
+            />
+          </label>
+
+          {error && <p className="profile-error">{error}</p>}
+          {success && <p className="profile-success">{success}</p>}
+
+          <button 
+            type="button" 
+            className="profile-submit profile-password-button" 
+            onClick={handleChangePassword}
+            disabled={isSubmitting}
           >
-            Senha
+            {isSubmitting ? 'Alterando...' : 'Alterar Senha'}
           </button>
-        </div>
-
-        {activeTab === 'profile' && (
-          <form className="profile-form" onSubmit={handleUpdateProfile}>
-            <div className="profile-photo-section">
-              {photoBase64 ? (
-                <img src={photoBase64} alt="Usuario" className="profile-photo" />
-              ) : (
-                <div className="profile-photo-placeholder">
-                  {(user.displayName || user.email || 'U').charAt(0).toUpperCase()}
-                </div>
-              )}
-              <label className="profile-photo-input">
-                <input type="file" accept="image/*" onChange={handlePhotoChange} />
-                Alterar foto
-              </label>
-            </div>
-
-            <label className="profile-field">
-              <span>Nome</span>
-              <input
-                type="text"
-                value={displayName}
-                onChange={(e) => setDisplayName(e.target.value)}
-                placeholder="Seu nome"
-              />
-            </label>
-
-            <label className="profile-field">
-              <span>Email</span>
-              <input type="email" value={user.email} disabled />
-            </label>
-
-            {error && <p className="profile-error">{error}</p>}
-            {success && <p className="profile-success">{success}</p>}
-
-            <button type="submit" className="profile-submit" disabled={isSubmitting}>
-              {isSubmitting ? 'Salvando...' : 'Salvar alteracoes'}
-            </button>
-          </form>
-        )}
-
-        {activeTab === 'password' && (
-          <form className="profile-form" onSubmit={handleChangePassword}>
-            <label className="profile-field">
-              <span>Senha atual</span>
-              <input
-                type="password"
-                value={currentPassword}
-                onChange={(e) => setCurrentPassword(e.target.value)}
-                placeholder="Sua senha atual"
-              />
-            </label>
-
-            <label className="profile-field">
-              <span>Nova senha</span>
-              <input
-                type="password"
-                value={newPassword}
-                onChange={(e) => setNewPassword(e.target.value)}
-                placeholder="Minimo 6 caracteres"
-              />
-            </label>
-
-            <label className="profile-field">
-              <span>Confirmar nova senha</span>
-              <input
-                type="password"
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                placeholder="Confirme a nova senha"
-              />
-            </label>
-
-            {error && <p className="profile-error">{error}</p>}
-            {success && <p className="profile-success">{success}</p>}
-
-            <button type="submit" className="profile-submit" disabled={isSubmitting}>
-              {isSubmitting ? 'Alterando...' : 'Alterar senha'}
-            </button>
-          </form>
-        )}
+        </form>
 
         <div className="profile-footer">
           <button className="profile-signout" onClick={handleSignOut}>

@@ -8,7 +8,7 @@ import AuthGate from './components/AuthGate';
 import UserProfileModal from './components/UserProfileModal';
 import Sidebar from './components/Sidebar';
 import ProjectSettingsModal from './components/ProjectSettingsModal';
-import { SettingsIcon, MenuIcon } from './components/Icons';
+import { SettingsIcon, MenuIcon, FilterIcon } from './components/Icons';
 import { formatTime } from './utils/timeFormatter';
 import { saveTasks, loadTasks } from './utils/storage';
 import { groupTasksByDate, isToday } from './utils/dateGrouping';
@@ -20,10 +20,12 @@ import { loadUserData, saveUserData, saveSharedProject, loadSharedProjectsForUse
 import { onAuthStateChanged, sendEmailVerification } from 'firebase/auth';
 import './App.css';
 
-function App() {
+function AppContent() {
   const { projectId } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
+  
+  console.log('AppContent render - projectId from URL:', projectId, 'pathname:', location.pathname);
   
   const [tasks, setTasks] = useState([]);
   const [input, setInput] = useState('');
@@ -49,11 +51,14 @@ function App() {
     description: '',
     displayMode: 'LIST',
     color: '#4adeb9',
+    groupByDay: true,
     members: [],
     adminId: 'local_user',
     adminEmail: 'Anonymous',
   }]);
   const [activeProjectId, setActiveProjectId] = useState('default');
+  const [selectedMemberFilter, setSelectedMemberFilter] = useState('all'); // 'all' or email of specific member
+  const [isFiltersOpen, setIsFiltersOpen] = useState(false); // Toggle for filters panel
   const [isProjectSettingsOpen, setIsProjectSettingsOpen] = useState(false);
   const [selectedProjectForSettings, setSelectedProjectForSettings] = useState(null);
   const inputRef = useRef(null);
@@ -171,9 +176,12 @@ function App() {
 
   // Sync URL parameter with active project
   useEffect(() => {
+    console.log('URL Sync useEffect - projectId:', projectId, 'location:', location.pathname, 'activeProjectId:', activeProjectId);
+    
     // Check if we're at the root path
     if (location.pathname === '/') {
       // Root path is for default project
+      console.log('At root path, setting to default');
       if (activeProjectId !== 'default') {
         setActiveProjectId('default');
         localStorage.setItem('rupt_active_project', 'default');
@@ -185,19 +193,21 @@ function App() {
     if (projectId) {
       // Check if project exists
       const projectExists = projects.some(p => p.id === projectId);
+      console.log('Checking project:', projectId, 'exists:', projectExists, 'in projects:', projects.map(p => p.id));
+      
       if (!projectExists) {
         // Project doesn't exist, redirect to default (root)
+        console.log('Project not found, redirecting to home');
         navigate('/', { replace: true });
         return;
       }
 
-      // Update active project if different from URL
-      if (activeProjectId !== projectId) {
-        setActiveProjectId(projectId);
-        localStorage.setItem('rupt_active_project', projectId);
-      }
+      // Always update active project when projectId changes
+      console.log('Setting activeProjectId to:', projectId);
+      setActiveProjectId(projectId);
+      localStorage.setItem('rupt_active_project', projectId);
     }
-  }, [projectId, projects, activeProjectId, navigate, location]);
+  }, [projectId, projects, navigate, location]);
 
   // Handle Firebase auth state
   useEffect(() => {
@@ -641,6 +651,8 @@ function App() {
     } else {
       navigate(`/projetos/${projectId}`);
     }
+    setSelectedMemberFilter('all'); // Reset member filter when switching projects
+    setIsFiltersOpen(false); // Close filters panel when switching projects
     setIsSidebarOpen(false);
   };
 
@@ -655,6 +667,7 @@ function App() {
       description: '',
       displayMode: 'LIST',
       color: '#4adeb9',
+      groupByDay: true,
       members: [],
       adminId: user?.uid || 'local_user',
       adminEmail: user?.email || 'Anonymous',
@@ -733,6 +746,46 @@ function App() {
 
     if (user) {
       saveUserData(user.uid, {
+        tasks: updatedTasks,
+        settings,
+        projects: updatedProjects,
+        activeProjectId: activeProjectId === projectId ? 'default' : activeProjectId,
+      });
+    }
+  };
+
+  const handleLeaveProject = async (projectId) => {
+    if (!user) return;
+    
+    const project = projects.find(p => p.id === projectId);
+    if (!project) return;
+
+    // Remove user from project members
+    const updatedMembers = (project.members || []).filter(m => m.email !== user.email);
+    const updatedProject = { ...project, members: updatedMembers };
+
+    // Update shared project in Firestore (remove this user from members)
+    await saveSharedProject(updatedProject);
+
+    // Remove project from local list (user no longer has access)
+    const updatedProjects = projects.filter(p => p.id !== projectId);
+    setProjects(updatedProjects);
+    localStorage.setItem('rupt_projects', JSON.stringify(updatedProjects));
+
+    // Remove tasks from this project from local state
+    const updatedTasks = tasks.filter(t => t.projectId !== projectId);
+    setTasks(updatedTasks);
+    saveTasks(updatedTasks);
+
+    // If leaving active project, navigate to default
+    if (activeProjectId === projectId) {
+      navigate('/');
+      localStorage.setItem('rupt_active_project', 'default');
+    }
+
+    // Update user data in Firestore
+    if (user) {
+      await saveUserData(user.uid, {
         tasks: updatedTasks,
         settings,
         projects: updatedProjects,
@@ -1103,8 +1156,20 @@ function App() {
   const filteredTasks = tasks.filter((task) => {
     // Tasks created before the project system should default to 'default' project
     const taskProjectId = task.projectId || 'default';
-    return taskProjectId === activeProjectId;
+    
+    // Filter by project
+    if (taskProjectId !== activeProjectId) return false;
+    
+    // Filter by member (only for non-default projects)
+    if (activeProjectId !== 'default' && selectedMemberFilter !== 'all') {
+      const taskAssignee = task.assignedTo || user?.email || 'Anonymous';
+      if (taskAssignee !== selectedMemberFilter) return false;
+    }
+    
+    return true;
   });
+  
+  console.log('Filtered tasks:', filteredTasks.length, 'for activeProjectId:', activeProjectId, 'total tasks:', tasks.length);
 
   // Get active project for display mode
   const activeProject = projects.find(p => p.id === activeProjectId);
@@ -1139,9 +1204,11 @@ function App() {
     return acc;
   }, {});
 
-  // For BLOCKS mode, sort all tasks together instead of grouping by date
-  const sortedBlocksTasks = (() => {
-    if (displayMode === 'BLOCKS') {
+  // For ungrouped mode (when groupByDay is false) or BLOCKS mode, sort all tasks together instead of grouping by date
+  const sortedUngroupedTasks = (() => {
+    const shouldCalculate = !activeProject?.groupByDay || displayMode === 'BLOCKS';
+    
+    if (shouldCalculate) {
       // 1. Running tasks (top)
       const runningTasks = filteredTasks
         .filter(task => task.status === 'running')
@@ -1172,7 +1239,7 @@ function App() {
   const currentProject = projects.find(p => p.id === activeProjectId);
   const projectColor = currentProject?.color || '#4adeb9';
 
-  const renderContent = () => (
+  return (
     <div className="app-container" style={{ '--projectColor': projectColor }}>
       <Sidebar
         isOpen={isSidebarOpen}
@@ -1303,10 +1370,54 @@ function App() {
       {projects.find(p => p.id === activeProjectId)?.id !== 'default' && projects.find(p => p.id === activeProjectId) && (
         <div className="project-header">
           <div className="project-header-content">
-            <h1 className="project-title">{projects.find(p => p.id === activeProjectId)?.name}</h1>
-            {projects.find(p => p.id === activeProjectId)?.description && (
-              <p className="project-description">{projects.find(p => p.id === activeProjectId)?.description}</p>
-            )}
+            <div className="project-header-text">
+              <h1 className="project-title">{projects.find(p => p.id === activeProjectId)?.name}</h1>
+              {projects.find(p => p.id === activeProjectId)?.description && (
+                <p className="project-description">{projects.find(p => p.id === activeProjectId)?.description}</p>
+              )}
+            </div>
+            <button 
+              className={`btn-toggle-filters ${isFiltersOpen ? 'active' : ''}`}
+              onClick={() => setIsFiltersOpen(!isFiltersOpen)}
+              title="Filtros"
+            >
+              <FilterIcon size={20} />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Filters Panel - Only for non-default projects */}
+      {activeProjectId !== 'default' && activeProject && isFiltersOpen && (
+        <div className="filters-panel">
+          <div className="filters-content">
+            <div className="filter-group">
+              <label htmlFor="member-filter" className="filter-label">
+                Responsável:
+              </label>
+              <select
+                id="member-filter"
+                className="filter-select"
+                value={selectedMemberFilter}
+                onChange={(e) => setSelectedMemberFilter(e.target.value)}
+              >
+                <option value="all">Todos</option>
+                {/* Admin */}
+                <option value={activeProject.adminEmail}>
+                  {activeProject.adminEmail === user?.email 
+                    ? 'Eu (ADM)' 
+                    : `${activeProject.adminEmail?.split('@')[0] || 'Admin'} (ADM)`}
+                </option>
+                {/* Members - exclude admin if they are in members list */}
+                {activeProject.members?.filter(m => m.email !== activeProject.adminEmail).map((member, index) => (
+                  <option key={index} value={member.email}>
+                    {member.email === user?.email 
+                      ? 'Eu' 
+                      : member.email?.split('@')[0] || member.email}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
         </div>
       )}
@@ -1371,17 +1482,17 @@ function App() {
         </form>
 
         <div className="tasks-list">
-          {displayMode === 'BLOCKS' ? (
-            // BLOCKS MODE: Simple grid layout without day grouping
-            sortedBlocksTasks.length === 0 ? (
+          {!activeProject?.groupByDay ? (
+            // NO GROUPING: Render all tasks without day groups
+            filteredTasks.length === 0 ? (
               <div className="empty-state">
                 <p>Nenhuma tarefa no projeto. Crie uma para começar!</p>
               </div>
             ) : (
-              <div className="tasks-blocks-grid">
-                {sortedBlocksTasks.map((task, index) => (
+              <div className={displayMode === 'BLOCKS' ? 'tasks-blocks-grid' : 'tasks-list-ungrouped'}>
+                {sortedUngroupedTasks.map((task) => (
                   <TaskItem
-                    key={`${task.id}-${index}`}
+                    key={task.id}
                     task={task}
                     isRunning={runningTaskId === task.id}
                     elapsedSeconds={0}
@@ -1409,7 +1520,7 @@ function App() {
               </div>
             )
           ) : (
-            // LIST MODE: Grouped by date (original behavior)
+            // GROUPED BY DAY: Use DayGroup component
             dateKeys.length === 0 ? (
               <div className="empty-state">
                 <p>Nenhuma tarefa ainda. Crie uma para começar!</p>
@@ -1436,6 +1547,7 @@ function App() {
                     currentProject={currentProject}
                     isDefaultProject={isDefaultProject}
                     currentUserEmail={user?.email || 'Anonymous'}
+                    displayMode={displayMode}
                   />
                 );
               })
@@ -1471,6 +1583,7 @@ function App() {
         onOpenAuth={handleOpenAuth}
         onUpdate={handleUpdateProject}
         onDelete={handleDeleteProjectFromSettings}
+        onLeaveProject={handleLeaveProject}
       />
 
       <AuthModal
@@ -1487,10 +1600,13 @@ function App() {
     </div>
   );
 
+}
+
+function App() {
   return (
     <Routes>
-      <Route path="/" element={renderContent()} />
-      <Route path="/projetos/:projectId" element={renderContent()} />
+      <Route path="/" element={<AppContent />} />
+      <Route path="/projetos/:projectId" element={<AppContent />} />
     </Routes>
   );
 }

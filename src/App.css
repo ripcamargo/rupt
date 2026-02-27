@@ -304,6 +304,14 @@
 .project-header-content {
   max-width: 1200px;
   margin: 0 auto;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+}
+
+.project-header-text {
+  flex: 1;
 }
 
 .project-title {
@@ -319,6 +327,103 @@
   color: rgba(255, 255, 255, 0.85);
   margin: 0;
   font-weight: 400;
+}
+
+.btn-toggle-filters {
+  background-color: rgba(255, 255, 255, 0.15);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 6px;
+  padding: 0.5rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #ffffff;
+  flex-shrink: 0;
+}
+
+.btn-toggle-filters:hover {
+  background-color: rgba(255, 255, 255, 0.25);
+  border-color: rgba(255, 255, 255, 0.5);
+}
+
+.btn-toggle-filters.active {
+  background-color: rgba(255, 255, 255, 0.3);
+  border-color: rgba(255, 255, 255, 0.6);
+}
+
+/* Filters Panel */
+.filters-panel {
+  background: linear-gradient(180deg, color-mix(in srgb, var(--projectColor) 70%, black) 0%, color-mix(in srgb, var(--projectColor) 50%, black) 100%);
+  border-bottom: 2px solid var(--projectColor);
+  box-shadow: 0 2px 12px rgba(74, 222, 185, 0.15);
+  animation: slideDown 0.2s ease;
+  margin-top: -1rem;
+  margin-bottom: 1rem;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    max-height: 0;
+  }
+  to {
+    opacity: 1;
+    max-height: 200px;
+  }
+}
+
+.filters-content {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0.75rem 1.5rem 1rem 1.5rem;
+  display: flex;
+  gap: 1.5rem;
+  flex-wrap: wrap;
+}
+
+.filter-group {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.filter-label {
+  font-size: 0.85rem;
+  color: rgba(255, 255, 255, 0.9);
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.filter-select {
+  background-color: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 6px;
+  color: #ffffff;
+  padding: 0.4rem 0.75rem;
+  font-size: 0.85rem;
+  cursor: pointer;
+  outline: none;
+  transition: all 0.2s ease;
+  font-family: inherit;
+  min-width: 150px;
+}
+
+.filter-select:hover {
+  border-color: rgba(255, 255, 255, 0.4);
+  background-color: rgba(0, 0, 0, 0.4);
+}
+
+.filter-select:focus {
+  border-color: rgba(255, 255, 255, 0.6);
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.1);
+}
+
+.filter-select option {
+  background-color: #2a2a2a;
+  color: #e5e5e5;
+  padding: 0.5rem;
 }
 
 @media (max-width: 768px) {
@@ -433,6 +538,12 @@
 }
 
 .tasks-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.tasks-list-ungrouped {
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
