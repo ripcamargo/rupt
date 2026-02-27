@@ -164,6 +164,21 @@ function App() {
 
       if (!currentUser) {
         setUserPhoto(null);
+        // Clear shared projects on logout, keep only default project
+        const defaultProject = [{
+          id: 'default',
+          name: 'Minhas Tarefas',
+          description: '',
+          displayMode: 'LIST',
+          color: '#4adeb9',
+          members: [],
+          adminId: 'local_user',
+          adminEmail: 'Anonymous',
+        }];
+        setProjects(defaultProject);
+        setActiveProjectId('default');
+        localStorage.setItem('rupt_projects', JSON.stringify(defaultProject));
+        localStorage.setItem('rupt_active_project', 'default');
         return;
       }
 
@@ -172,6 +187,15 @@ function App() {
         const localTasks = loadTasks();
         const localSettings = loadSettings();
         const localProjects = JSON.parse(localStorage.getItem('rupt_projects') || '[{"id":"default","name":"Minhas Tarefas","description":"","displayMode":"LIST","color":"#4adeb9","members":[],"adminId":"local_user","adminEmail":"Anonymous"}]');
+        const claimedLocalProjects = localProjects.map((project) =>
+          project.adminId === 'local_user'
+            ? {
+                ...project,
+                adminId: currentUser.uid,
+                adminEmail: currentUser.email || project.adminEmail,
+              }
+            : project
+        );
         const localActiveProjectId = localStorage.getItem('rupt_active_project') || 'default';
         const remoteData = await loadUserData(currentUser.uid);
 
@@ -184,7 +208,7 @@ function App() {
           const mergedSettings = mergeSettings(localSettings, remoteData.settings);
           
           // Start with local projects as base (includes "Minhas Tarefas")
-          let allProjects = [...localProjects];
+          let allProjects = [...claimedLocalProjects];
           
           // Merge with remote projects owned by this user
           if (remoteData.projects && remoteData.projects.length > 0) {
@@ -220,6 +244,20 @@ function App() {
           saveSettings(mergedSettings);
           localStorage.setItem('rupt_projects', JSON.stringify(allProjects));
           localStorage.setItem('rupt_active_project', mergedActiveProjectId);
+
+          const ownedSharedProjects = allProjects.filter(
+            (project) => project.adminId === currentUser.uid && project.members && project.members.length > 0
+          );
+          if (ownedSharedProjects.length > 0) {
+            await Promise.all(ownedSharedProjects.map((project) => saveSharedProject(project)));
+            await Promise.all(
+              ownedSharedProjects.map((project) => {
+                const projectTasks = migratedTasks.filter((task) => task.projectId === project.id);
+                return saveSharedProjectTasks(project.id, projectTasks);
+              })
+            );
+          }
+
           await saveUserData(currentUser.uid, {
             tasks: migratedTasks,
             settings: mergedSettings,
@@ -231,7 +269,7 @@ function App() {
           // No remote data - first time login for this user
           // Initialize with default project and any shared projects
           const migratedLocalTasks = migrateTasksWithAssignee(localTasks, currentUser.email);
-          let allProjects = [...localProjects];
+          let allProjects = [...claimedLocalProjects];
           
           console.log('First login - local projects:', localProjects);
           console.log('Shared projects:', sharedProjects);
@@ -251,6 +289,19 @@ function App() {
           setActiveProjectId(localActiveProjectId);
           localStorage.setItem('rupt_projects', JSON.stringify(allProjects));
           console.log('Setting projects on first login:', allProjects);
+
+          const ownedSharedProjects = allProjects.filter(
+            (project) => project.adminId === currentUser.uid && project.members && project.members.length > 0
+          );
+          if (ownedSharedProjects.length > 0) {
+            await Promise.all(ownedSharedProjects.map((project) => saveSharedProject(project)));
+            await Promise.all(
+              ownedSharedProjects.map((project) => {
+                const projectTasks = migratedLocalTasks.filter((task) => task.projectId === project.id);
+                return saveSharedProjectTasks(project.id, projectTasks);
+              })
+            );
+          }
           
           await saveUserData(currentUser.uid, {
             tasks: migratedLocalTasks,
@@ -545,6 +596,10 @@ function App() {
   };
 
   const handleCreateProject = (projectName) => {
+    if (!user) {
+      handleOpenAuth();
+      return;
+    }
     const newProject = {
       id: `project_${Date.now()}`,
       name: projectName,
@@ -588,6 +643,11 @@ function App() {
     if (updatedProject.members && updatedProject.members.length > 0) {
       console.log('Saving shared project with members:', updatedProject.members);
       await saveSharedProject(updatedProject);
+      
+      // Also save tasks for this shared project
+      const projectTasks = tasks.filter(t => t.projectId === updatedProject.id);
+      console.log(`Saving ${projectTasks.length} tasks for shared project ${updatedProject.id}`);
+      await saveSharedProjectTasks(updatedProject.id, projectTasks);
     }
     
     if (user) {
@@ -632,6 +692,7 @@ function App() {
   };
 
   const handleRenameProject = (projectId, newName) => {
+    if (projectId === 'default') return;
     const updatedProjects = projects.map((p) =>
       p.id === projectId ? { ...p, name: newName } : p
     );
@@ -1032,20 +1093,24 @@ function App() {
   const sortedBlocksTasks = (() => {
     if (displayMode === 'BLOCKS') {
       // 1. Running tasks (top)
-      const runningTasks = filteredTasks.filter(task => task.status === 'running');
+      const runningTasks = filteredTasks
+        .filter(task => task.status === 'running')
+        .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
       
       // 2. Urgent tasks
-      const urgentTasks = filteredTasks.filter(
-        task => task.status !== 'running' && task.status !== 'completed' && task.isUrgent
-      );
+      const urgentTasks = filteredTasks
+        .filter(task => task.status !== 'running' && task.status !== 'completed' && task.isUrgent)
+        .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
       
       // 3. Normal/Paused tasks
-      const normalTasks = filteredTasks.filter(
-        task => task.status !== 'running' && task.status !== 'completed' && !task.isUrgent
-      );
+      const normalTasks = filteredTasks
+        .filter(task => task.status !== 'running' && task.status !== 'completed' && !task.isUrgent)
+        .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
       
       // 4. Completed tasks (bottom)
-      const completedTasks = filteredTasks.filter(task => task.status === 'completed');
+      const completedTasks = filteredTasks
+        .filter(task => task.status === 'completed')
+        .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
       
       return [...runningTasks, ...urgentTasks, ...normalTasks, ...completedTasks];
     }
@@ -1068,6 +1133,8 @@ function App() {
         onCreateProject={handleCreateProject}
         onRenameProject={handleRenameProject}
         onOpenProjectSettings={handleOpenProjectSettings}
+        isLoggedIn={!!user}
+        onOpenAuth={handleOpenAuth}
       />
       <AuthGate
         isOpen={showAuthGate}
@@ -1184,7 +1251,7 @@ function App() {
       {projects.find(p => p.id === activeProjectId)?.id !== 'default' && projects.find(p => p.id === activeProjectId) && (
         <div className="project-header">
           <div className="project-header-content">
-            <h1 className="project-name">{projects.find(p => p.id === activeProjectId)?.name}</h1>
+            <h1 className="project-title">{projects.find(p => p.id === activeProjectId)?.name}</h1>
             {projects.find(p => p.id === activeProjectId)?.description && (
               <p className="project-description">{projects.find(p => p.id === activeProjectId)?.description}</p>
             )}
@@ -1260,9 +1327,9 @@ function App() {
               </div>
             ) : (
               <div className="tasks-blocks-grid">
-                {sortedBlocksTasks.map((task) => (
+                {sortedBlocksTasks.map((task, index) => (
                   <TaskItem
-                    key={task.id}
+                    key={`${task.id}-${index}`}
                     task={task}
                     isRunning={runningTaskId === task.id}
                     elapsedSeconds={0}
@@ -1348,6 +1415,8 @@ function App() {
         onClose={() => setIsProjectSettingsOpen(false)}
         project={selectedProjectForSettings}
         currentUserId={user?.uid || 'local_user'}
+        user={user}
+        onOpenAuth={handleOpenAuth}
         onUpdate={handleUpdateProject}
         onDelete={handleDeleteProjectFromSettings}
       />

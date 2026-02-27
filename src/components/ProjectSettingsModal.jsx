@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { CloseIcon, SettingsIcon } from './Icons';
 import '../styles/ProjectSettingsModal.css';
 
-function ProjectSettingsModal({ isOpen, onClose, project, currentUserId, onUpdate, onDelete }) {
+function ProjectSettingsModal({ isOpen, onClose, project, currentUserId, user, onOpenAuth, onUpdate, onDelete }) {
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -27,6 +27,8 @@ function ProjectSettingsModal({ isOpen, onClose, project, currentUserId, onUpdat
   }, [project, isOpen]);
 
   const isAdmin = currentUserId === project?.adminId;
+  const isDefaultProject = project?.id === 'default';
+  const canEdit = isAdmin || isDefaultProject;
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -58,7 +60,17 @@ function ProjectSettingsModal({ isOpen, onClose, project, currentUserId, onUpdat
 
   const handleSave = (e) => {
     e.preventDefault();
-    if (!isAdmin) return;
+    if (!canEdit) return;
+
+    if (isDefaultProject) {
+      onUpdate({
+        ...project,
+        displayMode: formData.displayMode,
+        color: formData.color,
+      });
+      onClose();
+      return;
+    }
 
     onUpdate({
       ...project,
@@ -84,7 +96,7 @@ function ProjectSettingsModal({ isOpen, onClose, project, currentUserId, onUpdat
         <div className="modal-header">
           <div className="modal-title-group">
             <h2>Configurações do Projeto</h2>
-            {!isAdmin && <span className="badge-viewer">Apenas visualização</span>}
+            {!canEdit && <span className="badge-viewer">Apenas visualização</span>}
           </div>
           <button className="btn-modal-close" onClick={onClose}>
             <CloseIcon size={24} />
@@ -92,7 +104,7 @@ function ProjectSettingsModal({ isOpen, onClose, project, currentUserId, onUpdat
         </div>
 
         <div className="modal-content">
-          {isAdmin ? (
+          {canEdit ? (
             <form onSubmit={handleSave} className="project-settings-form">
               {/* Basic Info */}
               <div className="form-section">
@@ -108,7 +120,7 @@ function ProjectSettingsModal({ isOpen, onClose, project, currentUserId, onUpdat
                     onChange={handleChange}
                     required
                     className="form-input"
-                    disabled={!isAdmin}
+                    disabled={!isAdmin || isDefaultProject}
                   />
                 </div>
 
@@ -121,124 +133,145 @@ function ProjectSettingsModal({ isOpen, onClose, project, currentUserId, onUpdat
                     onChange={handleChange}
                     className="form-textarea"
                     placeholder="Descreva o propósito deste projeto..."
-                    disabled={!isAdmin}
+                    disabled={!isAdmin || isDefaultProject}
                   />
                 </div>
+
+                {isDefaultProject && (
+                  <p className="default-project-note">
+                    Este projeto e seu HOME. Aqui voce pode ajustar apenas cor e modo de exibicao.
+                  </p>
+                )}
               </div>
 
               {/* Display Settings */}
               <div className="form-section">
                 <h3>Visualização</h3>
                 
-                <div className="form-group">
-                  <label htmlFor="project-mode">Modo de Exibição</label>
-                  <select
-                    id="project-mode"
-                    name="displayMode"
-                    value={formData.displayMode}
-                    onChange={handleChange}
-                    className="form-select"
-                    disabled={!isAdmin}
-                  >
-                    <option value="LIST">Lista</option>
-                    <option value="BLOCKS">Blocos</option>
-                  </select>
-                </div>
-
-                <div className="form-group">
-                  <label htmlFor="project-color">Cor do Projeto</label>
-                  <div className="color-picker-group">
-                    <input
-                      id="project-color"
-                      type="color"
-                      name="color"
-                      value={formData.color}
+                <div className="form-row">
+                  <div className="form-group">
+                    <label htmlFor="project-mode">Modo de Exibição</label>
+                    <select
+                      id="project-mode"
+                      name="displayMode"
+                      value={formData.displayMode}
                       onChange={handleChange}
-                      className="color-picker"
-                      disabled={!isAdmin}
-                    />
-                    <span 
-                      className="color-preview"
-                      style={{ backgroundColor: formData.color }}
-                    />
-                    <span className="color-value">{formData.color}</span>
-                    <button
-                      type="button"
-                      className="btn-reset-color"
-                      onClick={() => setFormData(prev => ({ ...prev, color: '#4adeb9' }))}
-                      disabled={!isAdmin}
+                      className="form-select"
+                      disabled={!canEdit}
                     >
-                      Padrão
-                    </button>
+                      <option value="LIST">Lista</option>
+                      <option value="BLOCKS">Blocos</option>
+                    </select>
+                  </div>
+
+                  <div className="form-group">
+                    <label htmlFor="project-color">Cor do Projeto</label>
+                    <div className="color-picker-group">
+                      <input
+                        id="project-color"
+                        type="color"
+                        name="color"
+                        value={formData.color}
+                        onChange={handleChange}
+                        className="color-picker"
+                        disabled={!canEdit}
+                      />
+                      <span className="color-value">{formData.color}</span>
+                      <button
+                        type="button"
+                        className="btn-reset-color"
+                        onClick={() => setFormData(prev => ({ ...prev, color: '#4adeb9' }))}
+                        disabled={!canEdit}
+                      >
+                        Padrão
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
 
               {/* Members */}
-              <div className="form-section">
-                <h3>Membros do Projeto</h3>
-                
-                <div className="members-list">
-                  <div className="member-item admin">
-                    <div className="member-info">
-                      <span className="member-email">{project.adminEmail || 'Você (Administrador)'}</span>
-                      <span className="member-role">ADM</span>
-                    </div>
-                  </div>
-
-                  {members.map((member, index) => (
-                    <div key={index} className="member-item">
-                      <div className="member-info">
-                        <span className="member-email">{member.email}</span>
-                        <span className="member-role">Convidado</span>
-                      </div>
+              {!isDefaultProject && (
+                <div className="form-section">
+                  <h3>Membros do Projeto</h3>
+                  
+                  {!user ? (
+                    <div className="form-group login-prompt">
+                      <p className="login-message">Você precisa estar logado para adicionar membros ao seu projeto</p>
                       <button
                         type="button"
-                        className="btn-remove-member"
-                        onClick={() => handleRemoveMember(member.email)}
-                        title="Remover membro"
+                        className="btn-login-prompt"
+                        onClick={onOpenAuth}
                       >
-                        ✕
+                        Entrar / Cadastrar
                       </button>
                     </div>
-                  ))}
-                </div>
+                  ) : (
+                    <div className="form-group add-member">
+                      <label htmlFor="new-member-email">Adicionar Membro</label>
+                      <div className="add-member-input-group">
+                        <input
+                          id="new-member-email"
+                          type="email"
+                          value={newMemberEmail}
+                          onChange={(e) => setNewMemberEmail(e.target.value)}
+                          onKeyPress={(e) => e.key === 'Enter' && handleAddMember(e)}
+                          placeholder="Digite o e-mail da pessoa"
+                          className="form-input"
+                        />
+                        <button
+                          type="button"
+                          className="btn-add-member"
+                          onClick={handleAddMember}
+                        >
+                          Adicionar
+                        </button>
+                      </div>
+                    </div>
+                  )}
 
-                <div className="form-group add-member">
-                  <label htmlFor="new-member-email">Adicionar Membro</label>
-                  <div className="add-member-input-group">
-                    <input
-                      id="new-member-email"
-                      type="email"
-                      value={newMemberEmail}
-                      onChange={(e) => setNewMemberEmail(e.target.value)}
-                      onKeyPress={(e) => e.key === 'Enter' && handleAddMember(e)}
-                      placeholder="Digite o e-mail da pessoa"
-                      className="form-input"
-                    />
-                    <button
-                      type="button"
-                      className="btn-add-member"
-                      onClick={handleAddMember}
-                    >
-                      Adicionar
-                    </button>
+                  <div className="members-list">
+                    <div className="member-item admin">
+                      <div className="member-info">
+                        <span className="member-email">{project.adminEmail || 'Você (Administrador)'}</span>
+                        <span className="member-role">ADM</span>
+                      </div>
+                    </div>
+
+                    {members.map((member, index) => (
+                      <div key={index} className="member-item">
+                        <div className="member-info">
+                          <span className="member-email">{member.email}</span>
+                          <span className="member-role">Convidado</span>
+                        </div>
+                        <button
+                          type="button"
+                          className="btn-remove-member"
+                          onClick={() => handleRemoveMember(member.email)}
+                          title="Remover membro"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    ))}
                   </div>
                 </div>
-              </div>
+              )}
 
               {/* Action Buttons */}
               <div className="form-section form-actions">
                 <button type="submit" className="btn-save-settings">
                   Salvar Alterações
                 </button>
-                <button
-                  type="button"
-                  className="btn-delete-project"
-                  onClick={() => setShowDeleteConfirm(true)}
-                >
-                  Apagar Projeto
-                </button>
+                {!isDefaultProject && (
+                  <button
+                    type="button"
+                    className="btn-delete-project"
+                    onClick={() => setShowDeleteConfirm(true)}
+                  >
+                    Apagar Projeto
+                  </button>
+                )}
               </div>
             </form>
           ) : (
@@ -266,10 +299,6 @@ function ProjectSettingsModal({ isOpen, onClose, project, currentUserId, onUpdat
                 <div className="viewer-field">
                   <label>Cor</label>
                   <div className="color-display">
-                    <span 
-                      className="color-preview"
-                      style={{ backgroundColor: project.color || '#4adeb9' }}
-                    />
                     <span>{project.color || '#4adeb9'}</span>
                   </div>
                 </div>

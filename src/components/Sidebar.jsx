@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { CloseIcon, FolderIcon, SettingsIcon } from './Icons';
 import '../styles/Sidebar.css';
 
-function Sidebar({ isOpen, onClose, projects, activeProjectId, onSelectProject, onCreateProject, onDeleteProject, onRenameProject, onOpenProjectSettings }) {
+function Sidebar({ isOpen, onClose, projects, activeProjectId, onSelectProject, onCreateProject, onDeleteProject, onRenameProject, onOpenProjectSettings, isLoggedIn, onOpenAuth }) {
   const [isCreating, setIsCreating] = useState(false);
   const [newProjectName, setNewProjectName] = useState('');
 
@@ -79,10 +79,17 @@ function Sidebar({ isOpen, onClose, projects, activeProjectId, onSelectProject, 
               <button onClick={handleCreateProject} className="btn-save">✓</button>
               <button onClick={() => { setIsCreating(false); setNewProjectName(''); }} className="btn-cancel">✕</button>
             </div>
-          ) : (
+          ) : isLoggedIn ? (
             <button className="btn-create-project" onClick={() => setIsCreating(true)}>
               + Criar novo Projeto
             </button>
+          ) : (
+            <div className="create-project-locked">
+              <p>Faça login para criar novos projetos.</p>
+              <button className="btn-login-sidebar" onClick={onOpenAuth}>
+                Entrar / Cadastrar
+              </button>
+            </div>
           )}
         </div>
       </div>
