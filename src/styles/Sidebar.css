@@ -212,10 +212,13 @@
   background-color: #1a1a1a;
   border: 1px solid #2a2a2a;
   border-radius: 6px;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .project-input {
   flex: 1;
+  min-width: 0;
   padding: 0.5rem;
   background-color: #0f0f0f;
   border: 1px solid #3a3a3a;
@@ -238,6 +241,11 @@
   cursor: pointer;
   padding: 0.25rem 0.5rem;
   transition: transform 0.2s ease;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 32px;
 }
 
 .btn-save {

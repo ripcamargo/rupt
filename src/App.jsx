@@ -61,6 +61,7 @@ function AppContent() {
   const [isFiltersOpen, setIsFiltersOpen] = useState(false); // Toggle for filters panel
   const [isProjectSettingsOpen, setIsProjectSettingsOpen] = useState(false);
   const [selectedProjectForSettings, setSelectedProjectForSettings] = useState(null);
+  const projectsRef = useRef(projects); // Store projects in ref to avoid useEffect dependency
   const inputRef = useRef(null);
   const lastNotificationRef = useRef({});
   const workHoursNotifiedRef = useRef({ lunch: null, exit: null }); // Track if already notified today
@@ -173,6 +174,11 @@ function AppContent() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Keep projectsRef in sync with projects
+  useEffect(() => {
+    projectsRef.current = projects;
+  }, [projects]);
 
   // Sync URL parameter with active project
   useEffect(() => {
@@ -401,21 +407,27 @@ function AppContent() {
       unsubscribeSharedProjectRef.current = null;
     }
 
-    // Determine if current project is shared
-    const currentProject = projects.find(p => p.id === activeProjectId);
+    // Determine if current project is shared (using ref to avoid dependency)
+    const currentProject = projectsRef.current.find(p => p.id === activeProjectId);
     const isSharedProject = currentProject && currentProject.members && currentProject.members.length > 0;
 
     if (isSharedProject && activeProjectId !== 'default') {
       // Setup listener for shared project tasks
       console.log('Setting up listener for shared project:', activeProjectId);
       unsubscribeSharedProjectRef.current = onSharedProjectTasksChange(activeProjectId, (sharedProjectTasks) => {
+        // Prevent loop: only update if not currently receiving from listener
+        if (isReceivingFromListenerRef.current) {
+          console.log('Skipping update - already receiving from listener');
+          return;
+        }
+        
         // Merge: replace tasks for this project, keep all other project tasks
         setTasks((prevTasks) => {
           const otherProjectTasks = prevTasks.filter(t => t.projectId !== activeProjectId);
           const merged = [...sharedProjectTasks, ...otherProjectTasks];
           console.log(`Merged tasks for shared project ${activeProjectId}: ${merged.length} total`);
           isReceivingFromListenerRef.current = true;
-          setTimeout(() => { isReceivingFromListenerRef.current = false; }, 100);
+          setTimeout(() => { isReceivingFromListenerRef.current = false; }, 500);
           return merged;
         });
       });
@@ -423,21 +435,24 @@ function AppContent() {
       // Setup listener for personal user tasks
       console.log('Setting up listener for user personal tasks');
       unsubscribeUserTasksRef.current = onUserTasksChange(user.uid, (personalTasks) => {
-        // Only update if not actively hydrating
-        if (!isHydratingRef.current) {
-          // Merge: replace personal project tasks, keep shared project tasks
-          setTasks((prevTasks) => {
-            const sharedProjectTasks = prevTasks.filter(t => {
-              const proj = projects.find(p => p.id === t.projectId);
-              return proj && proj.members && proj.members.length > 0;
-            });
-            const merged = [...personalTasks, ...sharedProjectTasks];
-            console.log(`Merged personal tasks: ${merged.length} total (${personalTasks.length} personal + ${sharedProjectTasks.length} shared)`);
-            isReceivingFromListenerRef.current = true;
-            setTimeout(() => { isReceivingFromListenerRef.current = false; }, 100);
-            return merged;
-          });
+        // Prevent loop: only update if not currently receiving from listener or hydrating
+        if (isReceivingFromListenerRef.current || isHydratingRef.current) {
+          console.log('Skipping personal tasks update - receiving or hydrating');
+          return;
         }
+        
+        // Merge: replace personal project tasks, keep shared project tasks
+        setTasks((prevTasks) => {
+          const sharedProjectTasks = prevTasks.filter(t => {
+            const proj = projectsRef.current.find(p => p.id === t.projectId);
+            return proj && proj.members && proj.members.length > 0;
+          });
+          const merged = [...personalTasks, ...sharedProjectTasks];
+          console.log(`Merged personal tasks: ${merged.length} total (${personalTasks.length} personal + ${sharedProjectTasks.length} shared)`);
+          isReceivingFromListenerRef.current = true;
+          setTimeout(() => { isReceivingFromListenerRef.current = false; }, 500);
+          return merged;
+        });
       });
     }
 
@@ -452,7 +467,7 @@ function AppContent() {
         unsubscribeSharedProjectRef.current = null;
       }
     };
-  }, [user, activeProjectId, projects, authLoading]);
+  }, [user, activeProjectId, authLoading]);
 
   // Save tasks to storage whenever they change
   useEffect(() => {
