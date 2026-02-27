@@ -235,51 +235,55 @@ function TaskItem({
       </div>
 
       <div className="task-actions">
-        {task.status !== 'completed' && (
+        {(task.assignedTo || currentUserEmail) === currentUserEmail && (
           <>
-            {!isRunning ? (
-              <button
-                className="btn btn-start"
-                onClick={onStart}
-                title="Iniciar tarefa"
-              >
-                <PlayIcon size={18} />
-              </button>
-            ) : (
-              <button
-                className="btn btn-pause"
-                onClick={onPause}
-                title="Pausar tarefa"
-              >
-                <PauseIcon size={18} />
-              </button>
+            {task.status !== 'completed' && (
+              <>
+                {!isRunning ? (
+                  <button
+                    className="btn btn-start"
+                    onClick={onStart}
+                    title="Iniciar tarefa"
+                  >
+                    <PlayIcon size={18} />
+                  </button>
+                ) : (
+                  <button
+                    className="btn btn-pause"
+                    onClick={onPause}
+                    title="Pausar tarefa"
+                  >
+                    <PauseIcon size={18} />
+                  </button>
+                )}
+                <button
+                  className={`btn btn-urgent ${task.isUrgent ? 'active' : ''}`}
+                  onClick={onToggleUrgent}
+                  title="Marcar como urgente"
+                >
+                  <UrgentIcon size={18} />
+                </button>
+                <button
+                  className="btn btn-complete"
+                  onClick={onComplete}
+                  title="Concluir tarefa"
+                >
+                  <CheckIcon size={18} />
+                </button>
+              </>
             )}
-            <button
-              className={`btn btn-urgent ${task.isUrgent ? 'active' : ''}`}
-              onClick={onToggleUrgent}
-              title="Marcar como urgente"
-            >
-              <UrgentIcon size={18} />
-            </button>
-            <button
-              className="btn btn-complete"
-              onClick={onComplete}
-              title="Concluir tarefa"
-            >
-              <CheckIcon size={18} />
-            </button>
-          </>
-        )}
-        {task.status === 'completed' && (
-          <>
-            <span className="status-badge"><CheckIcon size={16} /> Concluído</span>
-            <button
-              className="btn btn-reopen"
-              onClick={onReopen}
-              title="Reabrir tarefa"
-            >
-              <ReloadIcon size={18} />
-            </button>
+            {task.status === 'completed' && (
+              <>
+                <span className="status-badge"><CheckIcon size={16} /> Concluído</span>
+                <button
+                  className="btn btn-reopen"
+                  onClick={onReopen}
+                  title="Reabrir tarefa"
+                >
+                  <ReloadIcon size={18} />
+                </button>
+              </>
+            )}
           </>
         )}
       </div>

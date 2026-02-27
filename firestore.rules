@@ -1,15 +1,69 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function userEmail() {
+      return request.auth.token.email;
+    }
+
+    function isAdmin(projectData) {
+      return isAuthenticated() && projectData.adminId == request.auth.uid;
+    }
+
+    function isMember(projectData) {
+      return isAuthenticated()
+        && userEmail() != null
+        && projectData.memberEmails is list
+        && userEmail().lower() in projectData.memberEmails;
+    }
+
+    function isParticipant(projectData) {
+      return isAdmin(projectData) || isMember(projectData);
+    }
+
     match /users/{userId} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
+      allow read, write: if isOwner(userId);
     }
     
     match /sharedProjects/{projectId} {
-      // Temporary: Allow any authenticated user to write for testing
-      // This will be restricted after we verify it works
-      allow read, write: if request.auth != null;
-      allow delete: if request.auth != null && resource.data.adminId == request.auth.uid;
+      // Read only for project participants
+      allow read: if isParticipant(resource.data);
+
+      // Create only by admin creating their own project
+      allow create: if isAuthenticated()
+        && request.resource.data.id == projectId
+        && request.resource.data.adminId == request.auth.uid
+        && request.resource.data.memberEmails is list
+        && userEmail() != null
+        && userEmail().lower() in request.resource.data.memberEmails;
+
+      // Admin can update all fields.
+      // Members can update tasks/time fields but cannot change project metadata/permissions.
+      allow update: if isParticipant(resource.data) && (
+        isAdmin(resource.data)
+        || (
+          request.resource.data.adminId == resource.data.adminId
+          && request.resource.data.adminEmail == resource.data.adminEmail
+          && request.resource.data.memberEmails == resource.data.memberEmails
+          && request.resource.data.members == resource.data.members
+          && request.resource.data.name == resource.data.name
+          && request.resource.data.description == resource.data.description
+          && request.resource.data.color == resource.data.color
+          && request.resource.data.displayMode == resource.data.displayMode
+          && request.resource.data.groupByDay == resource.data.groupByDay
+          && request.resource.data.id == resource.data.id
+        )
+      );
+
+      // Delete only by admin
+      allow delete: if isAdmin(resource.data);
     }
   }
 }
