@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { useParams, useNavigate, useLocation, Routes, Route, Link } from 'react-router-dom';
 import DayGroup from './components/DayGroup';
 import TaskItem from './components/TaskItem';
 import SettingsModal from './components/SettingsModal';
@@ -20,6 +21,10 @@ import { onAuthStateChanged, sendEmailVerification } from 'firebase/auth';
 import './App.css';
 
 function App() {
+  const { projectId } = useParams();
+  const navigate = useNavigate();
+  const location = useLocation();
+  
   const [tasks, setTasks] = useState([]);
   const [input, setInput] = useState('');
   const [runningTaskId, setRunningTaskId] = useState(null);
@@ -151,10 +156,48 @@ function App() {
     }
     
     setProjects(projectsToSet);
-    if (savedActiveProjectId) {
+    if (savedActiveProjectId && !projectId && location.pathname === '/') {
+      // On initial load at root, navigate to last active project if not default
+      if (savedActiveProjectId !== 'default') {
+        navigate(`/projetos/${savedActiveProjectId}`, { replace: true });
+      } else {
+        setActiveProjectId('default');
+      }
+    } else if (savedActiveProjectId) {
       setActiveProjectId(savedActiveProjectId);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Sync URL parameter with active project
+  useEffect(() => {
+    // Check if we're at the root path
+    if (location.pathname === '/') {
+      // Root path is for default project
+      if (activeProjectId !== 'default') {
+        setActiveProjectId('default');
+        localStorage.setItem('rupt_active_project', 'default');
+      }
+      return;
+    }
+
+    // If we have a projectId from URL params
+    if (projectId) {
+      // Check if project exists
+      const projectExists = projects.some(p => p.id === projectId);
+      if (!projectExists) {
+        // Project doesn't exist, redirect to default (root)
+        navigate('/', { replace: true });
+        return;
+      }
+
+      // Update active project if different from URL
+      if (activeProjectId !== projectId) {
+        setActiveProjectId(projectId);
+        localStorage.setItem('rupt_active_project', projectId);
+      }
+    }
+  }, [projectId, projects, activeProjectId, navigate, location]);
 
   // Handle Firebase auth state
   useEffect(() => {
@@ -179,6 +222,8 @@ function App() {
         setActiveProjectId('default');
         localStorage.setItem('rupt_projects', JSON.stringify(defaultProject));
         localStorage.setItem('rupt_active_project', 'default');
+        // Navigate to root (default project)
+        navigate('/');
         return;
       }
 
@@ -591,7 +636,11 @@ function App() {
 
   // Project management handlers
   const handleSelectProject = (projectId) => {
-    setActiveProjectId(projectId);
+    if (projectId === 'default') {
+      navigate('/');
+    } else {
+      navigate(`/projetos/${projectId}`);
+    }
     setIsSidebarOpen(false);
   };
 
@@ -612,7 +661,8 @@ function App() {
     };
     const updatedProjects = [...projects, newProject];
     setProjects(updatedProjects);
-    setActiveProjectId(newProject.id);
+    // New projects are never default, so always navigate to /projetos/:id
+    navigate(`/projetos/${newProject.id}`);
     localStorage.setItem('rupt_projects', JSON.stringify(updatedProjects));
     localStorage.setItem('rupt_active_project', newProject.id);
     if (user) {
@@ -675,9 +725,9 @@ function App() {
     setProjects(updatedProjects);
     localStorage.setItem('rupt_projects', JSON.stringify(updatedProjects));
 
-    // If deleting active project, switch to default
+    // If deleting active project, switch to default (root path)
     if (activeProjectId === projectId) {
-      setActiveProjectId('default');
+      navigate('/');
       localStorage.setItem('rupt_active_project', 'default');
     }
 
@@ -1122,7 +1172,7 @@ function App() {
   const currentProject = projects.find(p => p.id === activeProjectId);
   const projectColor = currentProject?.color || '#4adeb9';
 
-  return (
+  const renderContent = () => (
     <div className="app-container" style={{ '--projectColor': projectColor }}>
       <Sidebar
         isOpen={isSidebarOpen}
@@ -1150,7 +1200,9 @@ function App() {
           >
             <MenuIcon size={20} />
           </button>
-          <img src="/rupt-logo.png" alt="Rupt" className="app-logo" />
+          <Link to="/" style={{ display: 'flex', alignItems: 'center' }}>
+            <img src="/rupt-logo.png" alt="Rupt" className="app-logo" />
+          </Link>
           <div className="total-time">
             <span className="label">Hoje:</span>
             <span className="time">{formatTime(totalTimeToday)}</span>
@@ -1433,6 +1485,13 @@ function App() {
         onClose={() => setIsProfileModalOpen(false)}
       />
     </div>
+  );
+
+  return (
+    <Routes>
+      <Route path="/" element={renderContent()} />
+      <Route path="/projetos/:projectId" element={renderContent()} />
+    </Routes>
   );
 }
 
