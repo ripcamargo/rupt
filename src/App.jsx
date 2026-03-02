@@ -94,6 +94,25 @@ function AppContent() {
     }));
   };
 
+  // Remove duplicate tasks (by ID) - keep only the first occurrence
+  const deduplicateTasks = (tasks) => {
+    const seen = new Set();
+    const unique = [];
+    
+    tasks.forEach(task => {
+      if (!seen.has(task.id)) {
+        seen.add(task.id);
+        unique.push(task);
+      }
+    });
+    
+    if (unique.length < tasks.length) {
+      console.warn(`Removed ${tasks.length - unique.length} duplicate tasks`);
+    }
+    
+    return unique;
+  };
+
   const mergeSettings = (localSettings, remoteSettings) => ({
     ...DEFAULT_SETTINGS,
     ...localSettings,
@@ -267,6 +286,8 @@ function AppContent() {
         if (remoteData) {
           const mergedTasks = mergeTasks(localTasks, remoteData.tasks || []);
           const migratedTasks = migrateTasksWithAssignee(mergedTasks, currentUser.email);
+          // Deduplicate in case there are existing duplicates from previous bug
+          const cleanedTasks = deduplicateTasks(migratedTasks);
           const mergedSettings = mergeSettings(localSettings, remoteData.settings);
           
           // Start with local projects as base (includes "Minhas Tarefas")
@@ -297,12 +318,12 @@ function AppContent() {
           checkForNewSharedProjects(allProjects);
           
           const mergedActiveProjectId = remoteData.activeProjectId || localActiveProjectId;
-          setTasks(migratedTasks);
+          setTasks(cleanedTasks);
           setSettings(mergedSettings);
           setProjects(allProjects);
           setActiveProjectId(mergedActiveProjectId);
           setUserPhoto(remoteData.photoURL || null);
-          saveTasks(migratedTasks);
+          saveTasks(cleanedTasks);
           saveSettings(mergedSettings);
           localStorage.setItem('rupt_projects', JSON.stringify(allProjects));
           localStorage.setItem('rupt_active_project', mergedActiveProjectId);
@@ -314,14 +335,23 @@ function AppContent() {
             await Promise.all(ownedSharedProjects.map((project) => saveSharedProject(project)));
             await Promise.all(
               ownedSharedProjects.map((project) => {
-                const projectTasks = migratedTasks.filter((task) => task.projectId === project.id);
+                const projectTasks = cleanedTasks.filter((task) => task.projectId === project.id);
                 return saveSharedProjectTasks(project.id, projectTasks);
               })
             );
           }
 
+          // Filter tasks: only save NON-SHARED project tasks to user's personal data
+          const personalTasksOnly = cleanedTasks.filter(t => {
+            const taskProject = allProjects.find(p => p.id === t.projectId);
+            const isTaskInSharedProject = taskProject && taskProject.members && taskProject.members.length > 0;
+            return !isTaskInSharedProject; // Keep only personal project tasks
+          });
+
+          console.log(`Hydration: saving ${personalTasksOnly.length} personal tasks (filtered from ${cleanedTasks.length} total)`);
+
           await saveUserData(currentUser.uid, {
-            tasks: migratedTasks,
+            tasks: personalTasksOnly,
             settings: mergedSettings,
             projects: allProjects,
             activeProjectId: mergedActiveProjectId,
@@ -422,15 +452,25 @@ function AppContent() {
           return;
         }
         
+        isReceivingFromListenerRef.current = true;
+        
+        // Deduplicate incoming tasks (safety check)
+        const uniqueSharedTasks = deduplicateTasks(sharedProjectTasks);
+        
         // Merge: replace tasks for this project, keep all other project tasks
         setTasks((prevTasks) => {
           const otherProjectTasks = prevTasks.filter(t => t.projectId !== activeProjectId);
-          const merged = [...sharedProjectTasks, ...otherProjectTasks];
-          console.log(`Merged tasks for shared project ${activeProjectId}: ${merged.length} total`);
-          isReceivingFromListenerRef.current = true;
-          setTimeout(() => { isReceivingFromListenerRef.current = false; }, 500);
-          return merged;
+          const merged = [...uniqueSharedTasks, ...otherProjectTasks];
+          const dedupedMerged = deduplicateTasks(merged);
+          console.log(`Merged tasks for shared project ${activeProjectId}: ${uniqueSharedTasks.length} from shared + ${otherProjectTasks.length} from other = ${dedupedMerged.length} total`);
+          return dedupedMerged;
         });
+        
+        // Reset flag after a delay
+        setTimeout(() => { 
+          isReceivingFromListenerRef.current = false; 
+          console.log('Listener flag reset');
+        }, 1000);
       });
     } else {
       // Setup listener for personal user tasks
@@ -442,18 +482,28 @@ function AppContent() {
           return;
         }
         
+        isReceivingFromListenerRef.current = true;
+        
+        // Deduplicate incoming tasks (safety check)
+        const uniquePersonalTasks = deduplicateTasks(personalTasks);
+        
         // Merge: replace personal project tasks, keep shared project tasks
         setTasks((prevTasks) => {
           const sharedProjectTasks = prevTasks.filter(t => {
             const proj = projectsRef.current.find(p => p.id === t.projectId);
             return proj && proj.members && proj.members.length > 0;
           });
-          const merged = [...personalTasks, ...sharedProjectTasks];
-          console.log(`Merged personal tasks: ${merged.length} total (${personalTasks.length} personal + ${sharedProjectTasks.length} shared)`);
-          isReceivingFromListenerRef.current = true;
-          setTimeout(() => { isReceivingFromListenerRef.current = false; }, 500);
-          return merged;
+          const merged = [...uniquePersonalTasks, ...sharedProjectTasks];
+          const dedupedMerged = deduplicateTasks(merged);
+          console.log(`Merged personal tasks: ${uniquePersonalTasks.length} personal + ${sharedProjectTasks.length} shared = ${dedupedMerged.length} total`);
+          return dedupedMerged;
         });
+        
+        // Reset flag after a delay
+        setTimeout(() => { 
+          isReceivingFromListenerRef.current = false;
+          console.log('Listener flag reset');
+        }, 1000);
       });
     }
 
@@ -634,6 +684,12 @@ function AppContent() {
   const syncToFirestore = async (tasksToSync, settingsToSync) => {
     if (!user) return;
     
+    // Prevent sync during listener updates to avoid loops
+    if (isReceivingFromListenerRef.current) {
+      console.log('Skipping sync - currently receiving from listener');
+      return;
+    }
+    
     // Determine if current project is shared
     const currentProject = projects.find(p => p.id === activeProjectId);
     const isSharedProject = currentProject && currentProject.members && currentProject.members.length > 0;
@@ -641,15 +697,25 @@ function AppContent() {
     console.log('syncToFirestore - activeProjectId:', activeProjectId, 'isSharedProject:', isSharedProject, 'currentProject:', currentProject);
     
     try {
-      // Save to user's personal data
+      // Filter tasks: only save NON-SHARED project tasks to user's personal data
+      // Shared project tasks should only live in sharedProjects collection
+      const personalTasks = tasksToSync.filter(t => {
+        const taskProject = projects.find(p => p.id === t.projectId);
+        const isTaskInSharedProject = taskProject && taskProject.members && taskProject.members.length > 0;
+        return !isTaskInSharedProject; // Keep only personal project tasks
+      });
+      
+      console.log(`Saving to userData: ${personalTasks.length} personal tasks (filtered from ${tasksToSync.length} total)`);
+      
+      // Save to user's personal data (only personal project tasks)
       await saveUserData(user.uid, {
-        tasks: tasksToSync,
+        tasks: personalTasks,
         settings: settingsToSync,
         projects,
         activeProjectId,
       });
       
-      // If viewing a shared project, also save tasks there (only tasks for this project)
+      // If viewing a shared project, save tasks there (only tasks for this project)
       if (isSharedProject && activeProjectId !== 'default') {
         const projectTasks = tasksToSync.filter(t => t.projectId === activeProjectId);
         console.log(`Saving ${projectTasks.length} tasks to shared project ${activeProjectId}`);
