@@ -178,6 +178,7 @@ function KanbanBoard({
                       isDefaultProject={isDefaultProject}
                       currentProject={currentProject}
                       currentUserEmail={currentUserEmail}
+                      isKanbanView={true}
                     />
                   </div>
                 ))

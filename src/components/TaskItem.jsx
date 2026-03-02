@@ -26,6 +26,7 @@ function TaskItem({
   isDefaultProject,
   currentProject,
   currentUserEmail,
+  isKanbanView = false,
 }) {
   const [editingField, setEditingField] = useState(null);
   const [editValue, setEditValue] = useState('');
@@ -93,7 +94,7 @@ function TaskItem({
 
   return (
     <div 
-      className={`task-item ${task.status} ${isRunning ? 'running' : ''} ${task.isUrgent ? 'urgent' : ''} ${isDragging ? 'dragging' : ''} ${isDragOver ? 'drag-over' : ''} ${isEditMode ? 'edit-mode' : ''}`}
+      className={`task-item ${task.status} ${isRunning ? 'running' : ''} ${task.isUrgent ? 'urgent' : ''} ${isDragging ? 'dragging' : ''} ${isDragOver ? 'drag-over' : ''} ${isEditMode ? 'edit-mode' : ''} ${isKanbanView ? 'kanban-view' : ''}`}
       draggable={true}
       onDragStart={handleDragStartLocal}
       onDragOver={handleDragOverLocal}
@@ -182,7 +183,7 @@ function TaskItem({
                 )}
               </span>
             )}
-            {!isDefaultProject && (
+            {!isDefaultProject && !isKanbanView && (
               <span 
                 className={`task-assigned-to ${isEditMode ? 'editable' : ''}`}
                 onDoubleClick={() => handleDoubleClick('assignedTo', task.assignedTo || currentUserEmail)}
