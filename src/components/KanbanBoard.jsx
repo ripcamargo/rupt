@@ -25,8 +25,11 @@ function KanbanBoard({
   const allMembers = [];
   
   if (currentProject?.adminEmail) {
+    // Find admin name from members list or use admin email
+    const adminMember = currentProject?.members?.find(m => m.email === currentProject.adminEmail);
     allMembers.push({
       email: currentProject.adminEmail,
+      name: adminMember?.name || currentProject.adminEmail.split('@')[0],
       isAdmin: true,
     });
   }
@@ -37,6 +40,7 @@ function KanbanBoard({
       if (member.email !== currentProject.adminEmail) {
         allMembers.push({
           email: member.email,
+          name: member.name || member.email.split('@')[0],
           isAdmin: false,
         });
       }
@@ -100,22 +104,20 @@ function KanbanBoard({
     setDragOverColumn(null);
   };
 
-  const getMemberDisplayName = (email, isAdmin) => {
-    if (email === currentUserEmail) {
-      return isAdmin ? 'Eu (ADM)' : 'Eu';
+  const getMemberDisplayName = (member) => {
+    if (member.email === currentUserEmail) {
+      return member.isAdmin ? 'Eu (ADM)' : 'Eu';
     }
-    const name = email?.split('@')[0] || email;
-    return isAdmin ? `${name} (ADM)` : name;
+    return member.isAdmin ? `${member.name} (ADM)` : member.name;
   };
 
   return (
     <div className="kanban-board">
       {Object.entries(tasksByMember).map(([memberEmail, memberTasks]) => {
         const member = allMembers.find(m => m.email === memberEmail);
-        const isAdmin = member?.isAdmin || false;
         const displayName = memberEmail === 'Não Atribuído' 
           ? memberEmail 
-          : getMemberDisplayName(memberEmail, isAdmin);
+          : (member ? getMemberDisplayName(member) : memberEmail);
         
         const completedCount = memberTasks.filter(t => t.status === 'completed').length;
         const activeCount = memberTasks.filter(t => t.status !== 'completed').length;

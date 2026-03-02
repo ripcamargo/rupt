@@ -12,6 +12,7 @@ function ProjectSettingsModal({ isOpen, onClose, project, currentUserId, user, o
   });
   const [members, setMembers] = useState([]);
   const [newMemberEmail, setNewMemberEmail] = useState('');
+  const [newMemberName, setNewMemberName] = useState('');
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
 
@@ -26,6 +27,7 @@ function ProjectSettingsModal({ isOpen, onClose, project, currentUserId, user, o
       });
       setMembers(project.members || []);
       setNewMemberEmail('');
+      setNewMemberName('');
     }
   }, [project, isOpen]);
 
@@ -44,9 +46,10 @@ function ProjectSettingsModal({ isOpen, onClose, project, currentUserId, user, o
 
   const handleAddMember = (e) => {
     e.preventDefault();
-    if (newMemberEmail.trim() && newMemberEmail.includes('@')) {
+    if (newMemberEmail.trim() && newMemberEmail.includes('@') && newMemberName.trim()) {
       const newMember = {
         email: newMemberEmail.trim().toLowerCase(),
+        name: newMemberName.trim(),
         joinedAt: new Date().toISOString(),
       };
       
@@ -54,6 +57,7 @@ function ProjectSettingsModal({ isOpen, onClose, project, currentUserId, user, o
       if (!members.some(m => m.email === newMember.email)) {
         setMembers([...members, newMember]);
         setNewMemberEmail('');
+        setNewMemberName('');
       }
     }
   };
@@ -222,6 +226,14 @@ function ProjectSettingsModal({ isOpen, onClose, project, currentUserId, user, o
                       <label htmlFor="new-member-email">Adicionar Membro</label>
                       <div className="add-member-input-group">
                         <input
+                          id="new-member-name"
+                          type="text"
+                          value={newMemberName}
+                          onChange={(e) => setNewMemberName(e.target.value)}
+                          placeholder="Nome da pessoa"
+                          className="form-input"
+                        />
+                        <input
                           id="new-member-email"
                           type="email"
                           value={newMemberEmail}
@@ -252,7 +264,7 @@ function ProjectSettingsModal({ isOpen, onClose, project, currentUserId, user, o
                     {members.map((member, index) => (
                       <div key={index} className="member-item">
                         <div className="member-info">
-                          <span className="member-email">{member.email}</span>
+                          <span className="member-email">{member.name || member.email}</span>
                           <span className="member-role">Convidado</span>
                         </div>
                         <button

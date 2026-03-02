@@ -1501,14 +1501,17 @@ function AppContent() {
                 <option value={activeProject.adminEmail}>
                   {activeProject.adminEmail === user?.email 
                     ? 'Eu (ADM)' 
-                    : `${activeProject.adminEmail?.split('@')[0] || 'Admin'} (ADM)`}
+                    : `${(() => {
+                        const adminMember = activeProject.members?.find(m => m.email === activeProject.adminEmail);
+                        return adminMember?.name || activeProject.adminEmail?.split('@')[0] || 'Admin';
+                      })()} (ADM)`}
                 </option>
                 {/* Members - exclude admin if they are in members list */}
                 {activeProject.members?.filter(m => m.email !== activeProject.adminEmail).map((member, index) => (
                   <option key={index} value={member.email}>
                     {member.email === user?.email 
                       ? 'Eu' 
-                      : member.email?.split('@')[0] || member.email}
+                      : member.name || member.email?.split('@')[0] || member.email}
                   </option>
                 ))}
               </select>

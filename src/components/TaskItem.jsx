@@ -301,16 +301,21 @@ function TaskItem({
                         autoFocus
                         className="task-edit-select"
                       >
-                        <option value={currentUserEmail}>Eu ({currentUserEmail?.split('@')[0]})</option>
+                        <option value={currentUserEmail}>Eu</option>
                         {currentProject?.members?.filter(m => m.email !== currentUserEmail).map((member) => (
                           <option key={member.email} value={member.email}>
-                            {member.email?.split('@')[0]}
+                            {member.name || member.email?.split('@')[0]}
                           </option>
                         ))}
                       </select>
                     ) : (
                       <span className="assigned-to-name">
-                        Responsável: {(task.assignedTo || currentUserEmail) === currentUserEmail ? 'Eu' : (task.assignedTo || currentUserEmail)?.split('@')[0]}
+                        {(() => {
+                          const assignedEmail = task.assignedTo || currentUserEmail;
+                          if (assignedEmail === currentUserEmail) return 'Responsável: Eu';
+                          const member = currentProject?.members?.find(m => m.email === assignedEmail);
+                          return `Responsável: ${member?.name || assignedEmail?.split('@')[0]}`;
+                        })()}
                       </span>
                     )}
                   </span>
