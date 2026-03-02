@@ -102,9 +102,11 @@ function TaskItem({
       onDrop={handleDropLocal}
       onDragEnd={onDragEnd}
     >
-      <div className="drag-handle" title="Arrastar para reordenar">
-        <DragHandleIcon size={16} />
-      </div>
+      {!isKanbanView && (
+        <div className="drag-handle" title="Arrastar para reordenar">
+          <DragHandleIcon size={16} />
+        </div>
+      )}
       {isEditMode && (
         <button
           className="btn-delete-task"
@@ -115,32 +117,16 @@ function TaskItem({
         </button>
       )}
       <div className="task-content">
-        <div className="task-info">
-          <div 
-            className={`task-description ${isEditMode ? 'editable' : ''}`}
-            onDoubleClick={() => handleDoubleClick('description', task.description)}
-          >
-            {task.isUrgent && <span className="urgent-badge"><UrgentIcon size={16} /></span>}
-            {editingField === 'description' ? (
-              <input
-                type="text"
-                value={editValue}
-                onChange={(e) => setEditValue(e.target.value)}
-                onBlur={handleEditBlur}
-                onKeyDown={handleEditKeyDown}
-                autoFocus
-                className="task-edit-input"
-              />
-            ) : (
-              task.description
-            )}
-          </div>
-          {(task.details || isEditMode) && (
+        {isKanbanView ? (
+          // Kanban layout: vertical stack
+          <>
+            {/* 1. Assunto */}
             <div 
-              className={`task-details ${isEditMode ? 'editable' : ''}`}
-              onDoubleClick={() => handleDoubleClick('details', task.details)}
+              className={`task-description ${isEditMode ? 'editable' : ''}`}
+              onDoubleClick={() => handleDoubleClick('description', task.description)}
             >
-              {editingField === 'details' ? (
+              {task.isUrgent && <span className="urgent-badge"><UrgentIcon size={16} /></span>}
+              {editingField === 'description' ? (
                 <input
                   type="text"
                   value={editValue}
@@ -149,17 +135,38 @@ function TaskItem({
                   onKeyDown={handleEditKeyDown}
                   autoFocus
                   className="task-edit-input"
-                  placeholder="Descrição da tarefa"
                 />
               ) : (
-                task.details || (isEditMode && <span className="placeholder-text">Clique duas vezes para adicionar descrição</span>)
+                task.description
               )}
             </div>
-          )}
-          <div className="task-meta">
-            <span className="task-start-time">{startTime}</span>
+
+            {/* 2. Descrição */}
+            {(task.details || isEditMode) && (
+              <div 
+                className={`task-details ${isEditMode ? 'editable' : ''}`}
+                onDoubleClick={() => handleDoubleClick('details', task.details)}
+              >
+                {editingField === 'details' ? (
+                  <input
+                    type="text"
+                    value={editValue}
+                    onChange={(e) => setEditValue(e.target.value)}
+                    onBlur={handleEditBlur}
+                    onKeyDown={handleEditKeyDown}
+                    autoFocus
+                    className="task-edit-input"
+                    placeholder="Descrição da tarefa"
+                  />
+                ) : (
+                  task.details || (isEditMode && <span className="placeholder-text">Clique duas vezes para adicionar descrição</span>)
+                )}
+              </div>
+            )}
+
+            {/* 3. Solicitante */}
             {(task.requester || isEditMode) && (
-              <span 
+              <div 
                 className={`task-requester ${isEditMode ? 'editable' : ''}`}
                 onDoubleClick={() => handleDoubleClick('requester', task.requester)}
               >
@@ -176,63 +183,162 @@ function TaskItem({
                   />
                 ) : (
                   task.requester ? (
-                    <span className="requester-name">{task.requester}</span>
+                    <span className="requester-label">Solicitante: <span className="requester-name">{task.requester}</span></span>
                   ) : (
                     isEditMode && <span className="placeholder-text">Clique duas vezes para adicionar solicitante</span>
                   )
                 )}
-              </span>
+              </div>
             )}
-            {!isDefaultProject && !isKanbanView && (
-              <span 
-                className={`task-assigned-to ${isEditMode ? 'editable' : ''}`}
-                onDoubleClick={() => handleDoubleClick('assignedTo', task.assignedTo || currentUserEmail)}
+
+            {/* 4. Horário e Tempo lado a lado */}
+            <div className="task-time-row">
+              <span className="task-start-time">Início: {startTime}</span>
+              <div 
+                className={`task-time ${isEditMode ? 'editable' : ''}`}
+                onDoubleClick={() => handleDoubleClick('time', task.totalDurationSeconds)}
+                title={isEditMode ? 'Clique duas vezes para editar (formato: HH:mm:ss)' : ''}
               >
-                {editingField === 'assignedTo' ? (
-                  <select
+                {editingField === 'time' ? (
+                  <input
+                    type="text"
                     value={editValue}
                     onChange={(e) => setEditValue(e.target.value)}
                     onBlur={handleEditBlur}
                     onKeyDown={handleEditKeyDown}
                     autoFocus
-                    className="task-edit-select"
-                  >
-                    <option value={currentUserEmail}>Eu ({currentUserEmail?.split('@')[0]})</option>
-                    {currentProject?.members?.filter(m => m.email !== currentUserEmail).map((member) => (
-                      <option key={member.email} value={member.email}>
-                        {member.email?.split('@')[0]}
-                      </option>
-                    ))}
-                  </select>
+                    className="task-edit-input time-input"
+                    placeholder="HH:mm:ss"
+                  />
                 ) : (
-                  <span className="assigned-to-name">
-                    Responsável: {(task.assignedTo || currentUserEmail) === currentUserEmail ? 'Eu' : (task.assignedTo || currentUserEmail)?.split('@')[0]}
+                  <>Tempo: {formatDuration(totalSeconds)}</>
+                )}
+              </div>
+            </div>
+          </>
+        ) : (
+          // Default layout: horizontal
+          <>
+            <div className="task-info">
+              <div 
+                className={`task-description ${isEditMode ? 'editable' : ''}`}
+                onDoubleClick={() => handleDoubleClick('description', task.description)}
+              >
+                {task.isUrgent && <span className="urgent-badge"><UrgentIcon size={16} /></span>}
+                {editingField === 'description' ? (
+                  <input
+                    type="text"
+                    value={editValue}
+                    onChange={(e) => setEditValue(e.target.value)}
+                    onBlur={handleEditBlur}
+                    onKeyDown={handleEditKeyDown}
+                    autoFocus
+                    className="task-edit-input"
+                  />
+                ) : (
+                  task.description
+                )}
+              </div>
+              {(task.details || isEditMode) && (
+                <div 
+                  className={`task-details ${isEditMode ? 'editable' : ''}`}
+                  onDoubleClick={() => handleDoubleClick('details', task.details)}
+                >
+                  {editingField === 'details' ? (
+                    <input
+                      type="text"
+                      value={editValue}
+                      onChange={(e) => setEditValue(e.target.value)}
+                      onBlur={handleEditBlur}
+                      onKeyDown={handleEditKeyDown}
+                      autoFocus
+                      className="task-edit-input"
+                      placeholder="Descrição da tarefa"
+                    />
+                  ) : (
+                    task.details || (isEditMode && <span className="placeholder-text">Clique duas vezes para adicionar descrição</span>)
+                  )}
+                </div>
+              )}
+              <div className="task-meta">
+                <span className="task-start-time">{startTime}</span>
+                {(task.requester || isEditMode) && (
+                  <span 
+                    className={`task-requester ${isEditMode ? 'editable' : ''}`}
+                    onDoubleClick={() => handleDoubleClick('requester', task.requester)}
+                  >
+                    {editingField === 'requester' ? (
+                      <input
+                        type="text"
+                        value={editValue}
+                        onChange={(e) => setEditValue(e.target.value)}
+                        onBlur={handleEditBlur}
+                        onKeyDown={handleEditKeyDown}
+                        autoFocus
+                        className="task-edit-input requester-input"
+                        placeholder="Solicitante"
+                      />
+                    ) : (
+                      task.requester ? (
+                        <span className="requester-name">{task.requester}</span>
+                      ) : (
+                        isEditMode && <span className="placeholder-text">Clique duas vezes para adicionar solicitante</span>
+                      )
+                    )}
                   </span>
                 )}
-              </span>
-            )}
-          </div>
-        </div>
-        <div 
-          className={`task-time ${isEditMode ? 'editable' : ''}`}
-          onDoubleClick={() => handleDoubleClick('time', task.totalDurationSeconds)}
-          title={isEditMode ? 'Clique duas vezes para editar (formato: HH:mm:ss)' : ''}
-        >
-          {editingField === 'time' ? (
-            <input
-              type="text"
-              value={editValue}
-              onChange={(e) => setEditValue(e.target.value)}
-              onBlur={handleEditBlur}
-              onKeyDown={handleEditKeyDown}
-              autoFocus
-              className="task-edit-input time-input"
-              placeholder="HH:mm:ss"
-            />
-          ) : (
-            formatDuration(totalSeconds)
-          )}
-        </div>
+                {!isDefaultProject && (
+                  <span 
+                    className={`task-assigned-to ${isEditMode ? 'editable' : ''}`}
+                    onDoubleClick={() => handleDoubleClick('assignedTo', task.assignedTo || currentUserEmail)}
+                  >
+                    {editingField === 'assignedTo' ? (
+                      <select
+                        value={editValue}
+                        onChange={(e) => setEditValue(e.target.value)}
+                        onBlur={handleEditBlur}
+                        onKeyDown={handleEditKeyDown}
+                        autoFocus
+                        className="task-edit-select"
+                      >
+                        <option value={currentUserEmail}>Eu ({currentUserEmail?.split('@')[0]})</option>
+                        {currentProject?.members?.filter(m => m.email !== currentUserEmail).map((member) => (
+                          <option key={member.email} value={member.email}>
+                            {member.email?.split('@')[0]}
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      <span className="assigned-to-name">
+                        Responsável: {(task.assignedTo || currentUserEmail) === currentUserEmail ? 'Eu' : (task.assignedTo || currentUserEmail)?.split('@')[0]}
+                      </span>
+                    )}
+                  </span>
+                )}
+              </div>
+            </div>
+            <div 
+              className={`task-time ${isEditMode ? 'editable' : ''}`}
+              onDoubleClick={() => handleDoubleClick('time', task.totalDurationSeconds)}
+              title={isEditMode ? 'Clique duas vezes para editar (formato: HH:mm:ss)' : ''}
+            >
+              {editingField === 'time' ? (
+                <input
+                  type="text"
+                  value={editValue}
+                  onChange={(e) => setEditValue(e.target.value)}
+                  onBlur={handleEditBlur}
+                  onKeyDown={handleEditKeyDown}
+                  autoFocus
+                  className="task-edit-input time-input"
+                  placeholder="HH:mm:ss"
+                />
+              ) : (
+                formatDuration(totalSeconds)
+              )}
+            </div>
+          </>
+        )}
       </div>
 
       <div className="task-actions">
