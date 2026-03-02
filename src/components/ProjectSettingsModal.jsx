@@ -166,6 +166,7 @@ function ProjectSettingsModal({ isOpen, onClose, project, currentUserId, user, o
                     >
                       <option value="LIST">Lista</option>
                       <option value="BLOCKS">Blocos</option>
+                      <option value="KANBAN">Kanban (por responsável)</option>
                     </select>
                   </div>
 

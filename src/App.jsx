@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, useLocation, Routes, Route, Link } from 'react-router-dom';
 import DayGroup from './components/DayGroup';
 import TaskItem from './components/TaskItem';
+import KanbanBoard from './components/KanbanBoard';
 import SettingsModal from './components/SettingsModal';
 import AuthModal from './components/AuthModal';
 import AuthGate from './components/AuthGate';
@@ -1024,6 +1025,19 @@ function AppContent() {
     );
   };
 
+  const assignTask = (taskId, assignedToEmail) => {
+    setTasks((prevTasks) => {
+      const updated = prevTasks.map((task) =>
+        task.id === taskId
+          ? { ...task, assignedTo: assignedToEmail }
+          : task
+      );
+      // Sync to Firestore after assigning
+      syncToFirestore(updated, settings);
+      return updated;
+    });
+  };
+
   const editTaskTime = (taskId, newSeconds) => {
     setTasks((prevTasks) => {
       const updated = prevTasks.map((task) => {
@@ -1497,7 +1511,32 @@ function AppContent() {
         </form>
 
         <div className="tasks-list">
-          {!activeProject?.groupByDay ? (
+          {displayMode === 'KANBAN' ? (
+            // KANBAN MODE: Display tasks in columns by assignee
+            activeProject && activeProject.members && activeProject.members.length > 0 ? (
+              <KanbanBoard
+                tasks={filteredTasks}
+                runningTaskId={runningTaskId}
+                onStart={startTask}
+                onPause={pauseTask}
+                onComplete={completeTask}
+                onToggleUrgent={toggleUrgent}
+                onReopen={reopenTask}
+                onDelete={deleteTask}
+                onUpdateTask={updateTask}
+                onEditTime={editTaskTime}
+                onAssignTask={assignTask}
+                currentProject={activeProject}
+                isDefaultProject={activeProjectId === 'default'}
+                currentUserEmail={user?.email || 'Anonymous'}
+              />
+            ) : (
+              <div className="empty-state">
+                <p>O modo Kanban está disponível apenas para projetos compartilhados com membros.</p>
+                <p>Adicione membros nas configurações do projeto para usar este modo.</p>
+              </div>
+            )
+          ) : !activeProject?.groupByDay ? (
             // NO GROUPING: Render all tasks without day groups
             filteredTasks.length === 0 ? (
               <div className="empty-state">
