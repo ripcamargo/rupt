@@ -230,7 +230,6 @@ function ProjectSettingsModal({ isOpen, onClose, project, currentUserId, user, o
                           onKeyPress={(e) => e.key === 'Enter' && handleAddMember(e)}
                           placeholder="Digite o e-mail da pessoa"
                           className="form-input"
-                          required
                         />
                         <button
                           type="button"
