@@ -50,8 +50,15 @@ export const saveSharedProject = async (project) => {
   try {
     const projectRef = doc(db, 'sharedProjects', project.id);
     
-    // Extract member emails for easier querying
-    const memberEmails = project.members.map(m => m.email.toLowerCase());
+    // Extract member emails for easier querying (include admin)
+    const normalizedMemberEmails = (project.members || [])
+      .map((member) => (member?.email || '').trim().toLowerCase())
+      .filter(Boolean);
+    const normalizedAdminEmail = (project.adminEmail || '').trim().toLowerCase();
+    const memberEmails = Array.from(new Set([
+      ...normalizedMemberEmails,
+      ...(normalizedAdminEmail ? [normalizedAdminEmail] : []),
+    ]));
     
     console.log('Saving shared project:', project.id);
     console.log('Admin ID:', project.adminId);
@@ -89,7 +96,7 @@ export const loadSharedProject = async (projectId) => {
 export const loadSharedProjectsForUser = async (userEmail) => {
   try {
     const projectsRef = collection(db, 'sharedProjects');
-    const normalizedEmail = userEmail.toLowerCase();
+    const normalizedEmail = (userEmail || '').trim().toLowerCase();
     console.log('Loading shared projects for:', normalizedEmail);
     const q = query(projectsRef, where('memberEmails', 'array-contains', normalizedEmail));
     const snapshot = await getDocs(q);

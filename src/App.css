@@ -7,6 +7,43 @@
   --primaryColor: #4adeb9; /* Default green, overridden by project color */
 }
 
+.auth-loading-screen {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: #1a1a1a;
+  color: #e5e5e5;
+}
+
+.auth-loading-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.9rem;
+}
+
+.auth-loading-content p {
+  margin: 0;
+  color: #bcbcbc;
+  font-size: 0.95rem;
+}
+
+.auth-loading-spinner {
+  width: 36px;
+  height: 36px;
+  border: 3px solid #2a2a2a;
+  border-top-color: #4adeb9;
+  border-radius: 50%;
+  animation: auth-loading-spin 0.8s linear infinite;
+}
+
+@keyframes auth-loading-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 .app-header {
   background-color: #0f0f0f;
   border-bottom: 1px solid #2a2a2a;

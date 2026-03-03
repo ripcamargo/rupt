@@ -411,6 +411,53 @@ function AppContent() {
     return () => unsubscribe();
   }, []);
 
+  // Refresh shared projects when user returns to the app (so new invites appear without re-login)
+  useEffect(() => {
+    if (!user || authLoading) return;
+
+    const refreshSharedProjects = async () => {
+      const sharedProjects = await loadSharedProjectsForUser(user.email);
+
+      setProjects((prevProjects) => {
+        // Keep default + owned projects, replace invited shared projects with fresh query data
+        const baseProjects = prevProjects.filter(
+          (project) => project.id === 'default' || project.adminId === user.uid
+        );
+
+        const mergedProjects = [...baseProjects];
+        sharedProjects.forEach((sharedProject) => {
+          const existingIndex = mergedProjects.findIndex((project) => project.id === sharedProject.id);
+          if (existingIndex >= 0) {
+            mergedProjects[existingIndex] = sharedProject;
+          } else {
+            mergedProjects.push(sharedProject);
+          }
+        });
+
+        localStorage.setItem('rupt_projects', JSON.stringify(mergedProjects));
+        return mergedProjects;
+      });
+    };
+
+    const handleFocus = () => {
+      refreshSharedProjects();
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        refreshSharedProjects();
+      }
+    };
+
+    window.addEventListener('focus', handleFocus);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      window.removeEventListener('focus', handleFocus);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [user, authLoading]);
+
   // Show auth gate only on the first visit if not logged in
   useEffect(() => {
     if (authLoading) return;
@@ -1242,6 +1289,17 @@ function AppContent() {
       setUser({ ...auth.currentUser });
     }
   };
+
+  if (authLoading) {
+    return (
+      <div className="auth-loading-screen">
+        <div className="auth-loading-content">
+          <div className="auth-loading-spinner" />
+          <p>Carregando sua conta...</p>
+        </div>
+      </div>
+    );
+  }
 
   // Calculate total time today
   const totalTimeToday = tasks.reduce(
