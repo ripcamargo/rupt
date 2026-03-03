@@ -47,7 +47,7 @@ function ProjectSettingsModal({ isOpen, onClose, project, currentUserId, user, o
     if (newMemberEmail.trim() && newMemberEmail.includes('@')) {
       const newMember = {
         email: newMemberEmail.trim().toLowerCase(),
-        name: newMemberName.trim() || '',
+        name: '',
         joinedAt: new Date().toISOString(),
       };
       
