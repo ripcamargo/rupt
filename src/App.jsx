@@ -860,9 +860,11 @@ function AppContent() {
     saveTasks(updatedTasks);
 
     // If leaving active project, navigate to default
+    const newActiveProjectId = activeProjectId === projectId ? 'default' : activeProjectId;
     if (activeProjectId === projectId) {
-      navigate('/');
+      setActiveProjectId('default');
       localStorage.setItem('rupt_active_project', 'default');
+      navigate('/');
     }
 
     // Update user data in Firestore
@@ -871,7 +873,7 @@ function AppContent() {
         tasks: updatedTasks,
         settings,
         projects: updatedProjects,
-        activeProjectId: activeProjectId === projectId ? 'default' : activeProjectId,
+        activeProjectId: newActiveProjectId,
       });
     }
   };

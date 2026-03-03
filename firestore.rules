@@ -46,9 +46,27 @@ service cloud.firestore {
 
       // Admin can update all fields.
       // Members can update tasks/time fields but cannot change project metadata/permissions.
+      // Exception: Members can remove themselves from the project.
       allow update: if isParticipant(resource.data) && (
         isAdmin(resource.data)
         || (
+          // Check if user is removing themselves from the project
+          isMember(resource.data)
+          && userEmail().lower() in resource.data.memberEmails
+          && !(userEmail().lower() in request.resource.data.memberEmails)
+          && request.resource.data.adminId == resource.data.adminId
+          && request.resource.data.adminEmail == resource.data.adminEmail
+          && request.resource.data.name == resource.data.name
+          && request.resource.data.description == resource.data.description
+          && request.resource.data.color == resource.data.color
+          && request.resource.data.displayMode == resource.data.displayMode
+          && request.resource.data.groupByDay == resource.data.groupByDay
+          && request.resource.data.id == resource.data.id
+          && request.resource.data.memberEmails.size() == resource.data.memberEmails.size() - 1
+          && request.resource.data.members.size() == resource.data.members.size() - 1
+        )
+        || (
+          // Original rule for member updates (tasks only)
           request.resource.data.adminId == resource.data.adminId
           && request.resource.data.adminEmail == resource.data.adminEmail
           && request.resource.data.memberEmails == resource.data.memberEmails
