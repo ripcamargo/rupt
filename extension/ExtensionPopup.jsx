@@ -289,11 +289,13 @@ const ExtensionPopup = () => {
 
   // Timer updater
   useEffect(() => {
-    if (!runningTask) return;
+    if (!runningTask || !runningTask.startTime) return;
 
     const interval = setInterval(() => {
       const elapsed = Math.floor((Date.now() - runningTask.startTime) / 1000);
-      setElapsedTime(elapsed);
+      if (!isNaN(elapsed) && elapsed >= 0) {
+        setElapsedTime(elapsed);
+      }
     }, 1000);
 
     return () => clearInterval(interval);
@@ -322,8 +324,20 @@ const ExtensionPopup = () => {
 
   const loadRunningTask = async () => {
     try {
+      // Try localStorage first (new approach)
+      const runningTaskJson = localStorage.getItem('rupt:running-task');
+      if (runningTaskJson) {
+        const task = JSON.parse(runningTaskJson);
+        // Only set if it has a valid startTime
+        if (task && typeof task.startTime === 'number' && task.startTime > 0) {
+          setRunningTask(task);
+          return;
+        }
+      }
+      
+      // Fallback to chrome.storage.local for older data
       const result = await chrome.storage.local.get(['runningTask']);
-      if (result.runningTask) {
+      if (result.runningTask && typeof result.runningTask.startTime === 'number') {
         setRunningTask(result.runningTask);
       }
     } catch (error) {
@@ -711,8 +725,8 @@ const ExtensionPopup = () => {
           <h3 className="recent-title">Recentes</h3>
           {recentTasks.map(task => (
             <div key={task.id} className="recent-task-item">
-              <span className="recent-task-description">{task.description}</span>
-              <span className="recent-task-time">{formatTime(task.duration)}</span>
+              <span className="recent-task-description">{task.description || 'Sem título'}</span>
+              <span className="recent-task-time">{formatTime(typeof task.duration === 'number' ? task.duration : 0)}</span>
             </div>
           ))}
         </div>
