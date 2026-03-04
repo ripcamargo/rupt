@@ -1,5 +1,33 @@
-// Content script that runs on rupt.vercel.app to relay login messages to extension
+// Content script that runs on rupt.vercel.app to relay login messages and sync tasks
 console.log('[Rupt Extension Content Script] Loaded');
+
+// Request pending tasks from background and send to app
+function syncPendingTasksWithApp() {
+  console.log('[Rupt Extension Content Script] Requesting pending tasks from background...');
+  
+  chrome.runtime.sendMessage({ type: 'GET_PENDING_TASKS' }, (response) => {
+    if (chrome.runtime.lastError) {
+      console.warn('[Rupt Extension Content Script] Error getting pending tasks:', chrome.runtime.lastError?.message);
+      return;
+    }
+    
+    const pendingTasks = response?.pendingTasks || [];
+    console.log('[Rupt Extension Content Script] Received ' + pendingTasks.length + ' pending tasks from background');
+    
+    if (pendingTasks.length > 0) {
+      // Send to app via postMessage
+      window.postMessage({
+        source: 'rupt-extension-sync',
+        type: 'PENDING_TASKS',
+        pendingTasks: pendingTasks
+      }, '*');
+      console.log('[Rupt Extension Content Script] Sent pending tasks to app');
+    }
+  });
+}
+
+// Sync tasks when page loads
+syncPendingTasksWithApp();
 
 // Listen for postMessage from the page
 window.addEventListener('message', (event) => {
@@ -28,4 +56,3 @@ window.addEventListener('message', (event) => {
 });
 
 console.log('[Rupt Extension Content Script] Message listener registered');
-

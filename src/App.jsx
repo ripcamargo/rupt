@@ -504,6 +504,64 @@ function AppContent() {
     }
   }, [location.search, user, authLoading]);
 
+  // Listen for pending tasks from extension via content script
+  useEffect(() => {
+    const handleExtensionMessage = async (event) => {
+      // Only accept from our own window
+      if (event.source !== window) return;
+      
+      // Check if this is a pending tasks message from content script
+      if (event.data && event.data.source === 'rupt-extension-sync' && event.data.type === 'PENDING_TASKS') {
+        console.log('[App] Received pending tasks from extension:', event.data.pendingTasks?.length || 0);
+        
+        if (!user) {
+          console.log('[App] User not logged in yet, skipping sync');
+          return;
+        }
+        
+        const pendingTasks = event.data.pendingTasks || [];
+        if (pendingTasks.length === 0) {
+          console.log('[App] No pending tasks to sync');
+          return;
+        }
+
+        try {
+          console.log('[App] Syncing ' + pendingTasks.length + ' pending tasks with Firestore');
+          
+          // Load user's current tasks
+          const userData = await loadUserData(user.uid);
+          let tasks = userData?.tasks || [];
+
+          // Merge pending tasks with existing tasks (avoid duplicates)
+          pendingTasks.forEach((pendingTask) => {
+            const existingIndex = tasks.findIndex(t => t.id === pendingTask.id);
+            if (existingIndex >= 0) {
+              // Update existing task (merge duration if pending task has more)
+              if (pendingTask.duration > tasks[existingIndex].duration) {
+                tasks[existingIndex].duration = pendingTask.duration;
+              }
+            } else {
+              // Add new task
+              tasks.push(pendingTask);
+            }
+          });
+
+          // Save merged tasks to Firestore
+          await saveUserData(user.uid, { tasks });
+          console.log('[App] ✓ Synced ' + pendingTasks.length + ' pending tasks to Firestore');
+          
+          // Update local state
+          setTasks(tasks);
+        } catch (error) {
+          console.error('[App] Error syncing pending tasks:', error.message);
+        }
+      }
+    };
+
+    window.addEventListener('message', handleExtensionMessage);
+    return () => window.removeEventListener('message', handleExtensionMessage);
+  }, [user]);
+
   // Sync pending tasks from Chrome extension when app loads
   useEffect(() => {
     console.log('[App] Sync effect running - user:', user?.email, 'authLoading:', authLoading);

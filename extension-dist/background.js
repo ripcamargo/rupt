@@ -50,6 +50,14 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     chrome.action.setBadgeText({ text: '' });
   } else if (request.type === 'OPEN_APP') {
     chrome.tabs.create({ url: request.url });
+  } else if (request.type === 'GET_PENDING_TASKS') {
+    // Content script is asking for pending tasks to relay to app
+    chrome.storage.local.get(['pendingTasks'], (result) => {
+      const pendingTasks = result?.pendingTasks || [];
+      console.log('[Background] Sending ' + pendingTasks.length + ' pending tasks to content script');
+      sendResponse({ pendingTasks });
+    });
+    return true; // Will respond async
   } else if (request.type === 'LOGIN_SUCCESS') {
     console.log('[Background] Received LOGIN_SUCCESS from content script, saving to storage');
     console.log('[Background] User data:', request.user);
