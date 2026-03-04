@@ -506,35 +506,18 @@ function AppContent() {
 
   // Listen for pending tasks from extension via content script
   useEffect(() => {
-    console.log('[App] Setting up message listener for extension...');
-    
     const handleExtensionMessage = async (event) => {
-      console.log('[App] *** RECEIVED MESSAGE *** source:', event.source === window ? 'SELF' : 'OTHER', 'data:', event.data);
-      
       // Only accept from our own window
-      if (event.source !== window) {
-        console.log('[App] Ignoring message - not from this window');
-        return;
-      }
+      if (event.source !== window) return;
       
       // Check if this is a pending tasks message from content script
       if (event.data && event.data.source === 'rupt-extension-sync' && event.data.type === 'PENDING_TASKS') {
-        console.log('[App] ✓ Received pending tasks from extension:', event.data.pendingTasks?.length || 0);
-        
-        if (!user) {
-          console.log('[App] User not logged in yet, skipping sync');
-          return;
-        }
+        if (!user) return; // User not logged in yet
         
         const pendingTasks = event.data.pendingTasks || [];
-        if (pendingTasks.length === 0) {
-          console.log('[App] No pending tasks to sync');
-          return;
-        }
+        if (pendingTasks.length === 0) return;
 
         try {
-          console.log('[App] ⏳ Syncing ' + pendingTasks.length + ' pending tasks with Firestore...');
-          
           // Load user's current tasks
           const userData = await loadUserData(user.uid);
           let tasks = userData?.tasks || [];
@@ -555,22 +538,19 @@ function AppContent() {
 
           // Save merged tasks to Firestore
           await saveUserData(user.uid, { tasks });
-          console.log('[App] ✓ Synced ' + pendingTasks.length + ' pending tasks to Firestore');
           
           // Update local state
           setTasks(tasks);
         } catch (error) {
-          console.error('[App] ✗ Error syncing pending tasks:', error.message);
+          console.error('[Extension Sync] Error syncing pending tasks:', error.message);
         }
       }
     };
 
     window.addEventListener('message', handleExtensionMessage);
-    console.log('[App] Message listener registered');
     
     return () => {
       window.removeEventListener('message', handleExtensionMessage);
-      console.log('[App] Message listener removed');
     };
   }, [user]);
 
