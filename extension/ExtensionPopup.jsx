@@ -3,7 +3,6 @@ import { auth, firebaseInitError } from '../src/utils/firebase';
 import { onAuthStateChanged, signInWithCredential, GoogleAuthProvider, signOut } from 'firebase/auth';
 import { loadUserData, saveUserData, loadSharedProjectsForUser } from '../src/utils/firestore';
 import { formatTime } from '../src/utils/timeFormatter';
-import './styles/popup.css';
 
 // Try to get GOOGLE_OAUTH_CLIENT_ID from window.ENV_CONFIG (set by popup.html)
 // Fallback to import.meta.env for development
