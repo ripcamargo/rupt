@@ -509,10 +509,13 @@ function AppContent() {
     console.log('[App] Setting up message listener for extension...');
     
     const handleExtensionMessage = async (event) => {
-      // Only accept from our own window
-      if (event.source !== window) return;
+      console.log('[App] *** RECEIVED MESSAGE *** source:', event.source === window ? 'SELF' : 'OTHER', 'data:', event.data);
       
-      console.log('[App] Received postMessage:', event.data?.source, event.data?.type);
+      // Only accept from our own window
+      if (event.source !== window) {
+        console.log('[App] Ignoring message - not from this window');
+        return;
+      }
       
       // Check if this is a pending tasks message from content script
       if (event.data && event.data.source === 'rupt-extension-sync' && event.data.type === 'PENDING_TASKS') {
@@ -530,7 +533,7 @@ function AppContent() {
         }
 
         try {
-          console.log('[App] Syncing ' + pendingTasks.length + ' pending tasks with Firestore');
+          console.log('[App] ⏳ Syncing ' + pendingTasks.length + ' pending tasks with Firestore...');
           
           // Load user's current tasks
           const userData = await loadUserData(user.uid);
@@ -557,7 +560,7 @@ function AppContent() {
           // Update local state
           setTasks(tasks);
         } catch (error) {
-          console.error('[App] Error syncing pending tasks:', error.message);
+          console.error('[App] ✗ Error syncing pending tasks:', error.message);
         }
       }
     };

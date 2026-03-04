@@ -29,8 +29,45 @@ function syncPendingTasksWithApp() {
   });
 }
 
-// Sync tasks when page loads
+// Sync tasks when page loads - try multiple times to ensure React is ready
+let syncAttempt = 0;
+function syncPendingTasksWithApp() {
+  syncAttempt++;
+  console.log('[Rupt Extension Content Script] Sync attempt #' + syncAttempt + ' - Requesting pending tasks from background...');
+  
+  chrome.runtime.sendMessage({ type: 'GET_PENDING_TASKS' }, (response) => {
+    if (chrome.runtime.lastError) {
+      console.warn('[Rupt Extension Content Script] Error getting pending tasks:', chrome.runtime.lastError?.message);
+      return;
+    }
+    
+    const pendingTasks = response?.pendingTasks || [];
+    console.log('[Rupt Extension Content Script] Received ' + pendingTasks.length + ' pending tasks from background (attempt #' + syncAttempt + ')');
+    
+    if (pendingTasks.length > 0) {
+      // Try multiple times with increasing delays to ensure React mounted
+      const delays = [100, 300, 500, 1000];
+      delays.forEach((delay, index) => {
+        setTimeout(() => {
+          console.log('[Rupt Extension Content Script] Attempt to send tasks after ' + delay + 'ms (try #' + (index + 1) + ')');
+          window.postMessage({
+            source: 'rupt-extension-sync',
+            type: 'PENDING_TASKS',
+            pendingTasks: pendingTasks,
+            timestamp: Date.now()
+          }, '*');
+          console.log('[Rupt Extension Content Script] Sent ' + pendingTasks.length + ' pending tasks to app at ' + delay + 'ms');
+        }, delay);
+      });
+    }
+  });
+}
+
+// Sync on page load
 syncPendingTasksWithApp();
+
+// Also sync again after a delay in case page reloads
+setTimeout(syncPendingTasksWithApp, 2000);
 
 // Listen for postMessage from the page
 window.addEventListener('message', (event) => {
