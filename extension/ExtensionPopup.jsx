@@ -189,8 +189,8 @@ const ExtensionPopup = () => {
     console.log(logMsg);
     addDebugLog(logMsg);
     
-    chrome.storage.local.get(['pendingLogin'], async (result) => {
-      if (result.pendingLogin) {
+    const checkPendingLogin = async (result) => {
+      if (result?.pendingLogin) {
         const msg1 = '[Extension] Found pending login, processing...';
         console.log(msg1);
         addDebugLog(msg1);
@@ -264,7 +264,26 @@ const ExtensionPopup = () => {
         console.log(msg5);
         addDebugLog(msg5);
       }
-    });
+    };
+    
+    // Check on initial load
+    chrome.storage.local.get(['pendingLogin'], checkPendingLogin);
+    
+    // Also listen for storage changes in case popup is already open when login happens
+    const handleStorageChange = (changes, namespace) => {
+      if (namespace === 'local' && changes.pendingLogin) {
+        console.log('[Extension] Storage change detected for pendingLogin:', changes.pendingLogin.newValue ? 'new value' : 'removed');
+        if (changes.pendingLogin.newValue) {
+          checkPendingLogin({ pendingLogin: changes.pendingLogin.newValue });
+        }
+      }
+    };
+    
+    chrome.storage.onChanged.addListener(handleStorageChange);
+    
+    return () => {
+      chrome.storage.onChanged.removeListener(handleStorageChange);
+    };
   }, []); // Run only once when popup opens
 
   // Listen for login messages from content script (for backward compatibility)
