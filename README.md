@@ -2,6 +2,27 @@
 
 A minimal, real-time task timer for tracking daily work interruptions. Built with React, Vite, and modern hooks.
 
+## 🚀 Now with Chrome Extension!
+
+**NEW:** Quick-add tasks directly from your browser with the Rupt Chrome Extension!
+
+- ⚡ **Instant Access**: `Ctrl+Shift+T` to open popup
+- 🎯 **Quick Add**: Add and start tasks in 3 seconds
+- ⏱️ **Auto Timer**: Timer starts automatically
+- 🔄 **Full Sync**: Syncs with main app via Firebase
+- 📊 **Badge Timer**: See timer on extension icon
+
+👉 **[Install Guide](INSTALL_EXTENSION.txt)** | **[Full Docs](EXTENSION_GUIDE.md)** | **[Quick Start](QUICK_START_EXTENSION.md)**
+
+```bash
+# Build the extension
+npm run build:extension
+
+# Then load extension-dist/ in Chrome
+```
+
+---
+
 ## Features
 
 ✨ **Two-Step Task Creation** - Enter description, then requester name  

@@ -12,7 +12,28 @@ const firebaseConfig = {
   measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID,
 };
 
-const app = initializeApp(firebaseConfig);
+const missingFirebaseEnv = Object.entries(firebaseConfig)
+  .filter(([, value]) => !value)
+  .map(([key]) => key);
 
-export const auth = getAuth(app);
-export const db = getFirestore(app);
+let app;
+let auth;
+let db;
+let firebaseInitError = null;
+
+try {
+  if (missingFirebaseEnv.length > 0) {
+    throw new Error(
+      `Firebase config ausente: ${missingFirebaseEnv.join(', ')}. Crie .env.local com as variáveis VITE_FIREBASE_*.`
+    );
+  }
+
+  app = initializeApp(firebaseConfig);
+  auth = getAuth(app);
+  db = getFirestore(app);
+} catch (error) {
+  firebaseInitError = error;
+  console.error('[Firebase Init Error]', error);
+}
+
+export { auth, db, firebaseInitError };

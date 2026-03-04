@@ -72,6 +72,7 @@ function AppContent() {
   const unsubscribeUserTasksRef = useRef(null); // Real-time listener for user's personal tasks
   const unsubscribeSharedProjectRef = useRef(null); // Real-time listener for shared project tasks
   const isReceivingFromListenerRef = useRef(false); // Prevent sync loop when receiving from listener
+  const isExtensionLoginModeRef = useRef(false); // Track if we're in extension login mode (survives URL changes)
   const authGateSeenKey = 'rupt_seen_auth_gate';
   const seenSharedProjectsKey = 'rupt_seen_shared_projects'; // Track which shared projects user has seen notification for
 
@@ -416,8 +417,15 @@ function AppContent() {
     const params = new URLSearchParams(location.search);
     const isExtensionLogin = params.get('mode') === 'extension-login';
     
+    // Remember if we're in extension login mode (survives URL changes)
     if (isExtensionLogin) {
-      console.log('[Extension Login] Detected extension-login mode');
+      isExtensionLoginModeRef.current = true;
+    }
+    
+    console.log('[Extension Login] useEffect running - isExtensionLogin:', isExtensionLogin, 'remembered:', isExtensionLoginModeRef.current, 'hasUser:', !!user, 'authLoading:', authLoading, 'userEmail:', user?.email);
+    
+    if (isExtensionLoginModeRef.current) {
+      console.log('[Extension Login] In extension login mode');
       
       // If not logged in, open auth modal
       if (!user && !authLoading) {
@@ -432,36 +440,144 @@ function AppContent() {
         user.getIdToken().then((idToken) => {
           console.log('[Extension Login] Got ID token, sending to extension');
           
-          // Send message to extension
-          if (window.chrome?.runtime) {
-            // Try to send to extension with known ID
-            const message = {
-              type: 'LOGIN_SUCCESS',
-              idToken: idToken,
-              user: {
-                uid: user.uid,
-                email: user.email,
-                displayName: user.displayName,
-                photoURL: user.photoURL,
+          const message = {
+            type: 'LOGIN_SUCCESS',
+            idToken: idToken,
+            user: {
+              uid: user.uid,
+              email: user.email,
+              displayName: user.displayName,
+              photoURL: user.photoURL,
+            }
+          };
+          
+          console.log('[Extension Login] Attempting to send message to extension:', message.type);
+          
+          // Method 1: Try to send directly to extension (if chrome.runtime is available)
+          if (window.chrome?.runtime?.sendMessage) {
+            // Get extension ID from URL parameter if provided
+            const params = new URLSearchParams(window.location.search);
+            const extensionId = params.get('extensionId');
+            
+            console.log('[Extension Login] Full URL:', window.location.href);
+            console.log('[Extension Login] Search params:', window.location.search);
+            console.log('[Extension Login] Trying direct chrome.runtime.sendMessage, extensionId:', extensionId);
+            
+            try {
+              if (extensionId) {
+                chrome.runtime.sendMessage(extensionId, message, (response) => {
+                  if (chrome.runtime.lastError) {
+                    console.log('[Extension Login] Error with direct message:', chrome.runtime.lastError.message);
+                  } else {
+                    console.log('[Extension Login] Direct message sent successfully:', response);
+                  }
+                });
+              } else {
+                // Try without extension ID (works if called from extension context)
+                chrome.runtime.sendMessage(message, (response) => {
+                  if (chrome.runtime.lastError) {
+                    console.log('[Extension Login] Error with context message:', chrome.runtime.lastError.message);
+                  } else {
+                    console.log('[Extension Login] Context message sent successfully:', response);
+                  }
+                });
               }
-            };
-            
-            console.log('[Extension Login] Attempting to send message to extension:', message.type);
-            
-            // Broadcast to extension (try common extension message pattern)
-            window.postMessage({ 
-              source: 'rupt-extension-login',
-              ...message 
-            }, '*');
-            
-            console.log('[Extension Login] Message posted, tab should close soon');
+            } catch (error) {
+              console.error('[Extension Login] Exception sending message:', error);
+            }
           }
+          
+          // Method 2: Also broadcast via postMessage as fallback
+          window.postMessage({ 
+            source: 'rupt-extension-login',
+            ...message 
+          }, '*');
+          
+          console.log('[Extension Login] Message posted, tab should close soon');
+          
+          // Reset the flag so we don't keep sending messages
+          isExtensionLoginModeRef.current = false;
         }).catch((error) => {
           console.error('[Extension Login] Error getting ID token:', error);
         });
       }
     }
   }, [location.search, user, authLoading]);
+
+  // Sync pending tasks from Chrome extension when app loads
+  useEffect(() => {
+    console.log('[App] Sync effect running - user:', user?.email, 'authLoading:', authLoading);
+    if (!user || authLoading) {
+      console.log('[App] Skipping sync - user or authLoading');
+      return;
+    }
+
+    const syncExtensionPendingTasks = async () => {
+      try {
+        console.log('[App] Attempting to sync pending tasks from extension...');
+        
+        // Check if running in extension/chrome context
+        if (typeof chrome?.storage?.local === 'undefined') {
+          console.log('[App] No chrome.storage.local available (normal webpage context) - skipping sync');
+          return; // Not in extension context
+        }
+
+        console.log('[App] chrome.storage.local is available, attempting get...');
+        
+        const result = await new Promise((resolve, reject) => {
+          try {
+            chrome.storage.local.get(['pendingTasks'], (result) => {
+              if (chrome.runtime.lastError) {
+                reject(new Error(chrome.runtime.lastError.message));
+              } else {
+                resolve(result);
+              }
+            });
+          } catch (e) {
+            reject(e);
+          }
+        });
+
+        const { pendingTasks = [] } = result;
+        
+        if (pendingTasks.length === 0) {
+          console.log('[App] No pending tasks to sync');
+          return;
+        }
+
+        console.log('[App] Found ' + pendingTasks.length + ' pending tasks from extension');
+
+        // Load user's current tasks
+        const userData = await loadUserData(user.uid);
+        let tasks = userData?.tasks || [];
+
+        // Merge pending tasks with existing tasks (avoid duplicates)
+        pendingTasks.forEach((pendingTask) => {
+          const existingIndex = tasks.findIndex(t => t.id === pendingTask.id);
+          if (existingIndex >= 0) {
+            // Update existing task (merge duration if pending task has more)
+            if (pendingTask.duration > tasks[existingIndex].duration) {
+              tasks[existingIndex].duration = pendingTask.duration;
+            }
+          } else {
+            // Add new task
+            tasks.push(pendingTask);
+          }
+        });
+
+        // Save merged tasks to Firestore
+        await saveUserData(user.uid, { tasks });
+        console.log('[App] ✓ Synced ' + pendingTasks.length + ' pending tasks to Firestore');
+
+        // Clear pending tasks from storage after sync
+        chrome.storage.local.remove(['pendingTasks']);
+      } catch (error) {
+        console.log('[App] Sync error (this is OK on regular webpage):', error.message);
+      }
+    };
+
+    syncExtensionPendingTasks();
+  }, [user, authLoading]);
 
   // Refresh shared projects when user returns to the app (so new invites appear without re-login)
   useEffect(() => {

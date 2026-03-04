@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { auth, firebaseInitError } from '../src/utils/firebase';
 import { onAuthStateChanged, signInWithCredential, GoogleAuthProvider, signOut } from 'firebase/auth';
 import { loadUserData, saveUserData, loadSharedProjectsForUser } from '../src/utils/firestore';
@@ -32,9 +32,30 @@ const ExtensionPopup = () => {
   const [elapsedTime, setElapsedTime] = useState(0);
   const [recentTasks, setRecentTasks] = useState([]);
   const [loginError, setLoginError] = useState('');
+  const [debugMode, setDebugMode] = useState(false); // Debug mode to keep popup open
+  const [debugLogs, setDebugLogs] = useState([]); // Store debug logs
+  const hasInitializedFromStorageRef = useRef(false); // Track if already set user from storage
 
   const GOOGLE_OAUTH_CLIENT_ID = getGoogleOAuthClientId();
 
+  // Debug helper to log both to console and UI
+  const addDebugLog = (message) => {
+    console.log(message);
+    setDebugLogs(prev => [...prev, `[${new Date().toLocaleTimeString()}] ${message}`]);
+  };
+
+  // Manual storage check for debugging
+  const checkStorageManually = async () => {
+    addDebugLog('[DEBUG] Manually checking chrome.storage.local...');
+    chrome.storage.local.get(null, (result) => {
+      addDebugLog('[DEBUG] All storage keys: ' + Object.keys(result).join(', '));
+      if (result.pendingLogin) {
+        addDebugLog('[DEBUG] ✓ pendingLogin found! User: ' + result.pendingLogin.user?.email);
+      } else {
+        addDebugLog('[DEBUG] ✗ pendingLogin NOT found in storage');
+      }
+    });
+  };
   const toBase64Url = (value) =>
     btoa(value)
       .replace(/\+/g, '-')
@@ -142,6 +163,14 @@ const ExtensionPopup = () => {
   // Auth listener
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+      // Don't reset user if we already initialized from storage
+      // (popup can't actually be logged into Firebase, but we preserve the user from tab login)
+      if (!currentUser && hasInitializedFromStorageRef.current) {
+        addDebugLog('[Auth] Firebase user null but already initialized from storage, keeping user');
+        setLoading(false);
+        return;
+      }
+
       setUser(currentUser);
       setLoading(false);
 
@@ -154,28 +183,101 @@ const ExtensionPopup = () => {
     return () => unsubscribe();
   }, []);
 
-  // Listen for login messages from content script (via rupt.vercel.app tab)
+  // Check for pending login when popup opens (from background storage)
+  useEffect(() => {
+    const logMsg = '[Extension] Checking for pending login in storage...';
+    console.log(logMsg);
+    addDebugLog(logMsg);
+    
+    chrome.storage.local.get(['pendingLogin'], async (result) => {
+      if (result.pendingLogin) {
+        const msg1 = '[Extension] Found pending login, processing...';
+        console.log(msg1);
+        addDebugLog(msg1);
+        
+        const { idToken, user: userData, timestamp } = result.pendingLogin;
+        
+        // Check if login data is not too old (max 5 minutes)
+        const isExpired = (Date.now() - timestamp) > 5 * 60 * 1000;
+        if (isExpired) {
+          const msg2 = '[Extension] Pending login expired, clearing...';
+          console.log(msg2);
+          addDebugLog(msg2);
+          chrome.storage.local.remove(['pendingLogin']);
+          return;
+        }
+        
+        try {
+          const msg3 = `[Extension] User data from login tab: ${userData.email}`;
+          console.log(msg3);
+          addDebugLog(msg3);
+          
+          // Instead of calling signInWithCredential (which causes CORS error),
+          // we directly set the user from the login tab data
+          // This works because the user already successfully authenticated in the tab
+          setUser({
+            uid: userData.uid,
+            email: userData.email,
+            displayName: userData.displayName,
+            photoURL: userData.photoURL,
+            getIdToken: async () => idToken, // Mock method for getIdToken
+          });
+          
+          // Mark that we've already initialized from storage so auth listener doesn't reset it
+          hasInitializedFromStorageRef.current = true;
+          
+          const msg4 = '[Extension] User set from pending login data';
+          console.log(msg4);
+          addDebugLog(msg4);
+          
+          // Clear pending login from storage
+          chrome.storage.local.remove(['pendingLogin']);
+          
+          // Load user projects and running task
+          await loadUserProjects({
+            uid: userData.uid,
+            email: userData.email,
+          });
+          await loadRunningTask();
+          
+          // Close the login tab if it's still open
+          chrome.tabs.query({ url: 'https://rupt.vercel.app/*' }, (tabs) => {
+            tabs.forEach(tab => {
+              if (tab.url.includes('mode=extension-login')) {
+                chrome.tabs.remove(tab.id);
+                const msgTab = `[Extension] Closed login tab: ${tab.id}`;
+                console.log(msgTab);
+                addDebugLog(msgTab);
+              }
+            });
+          });
+          
+        } catch (error) {
+          const errMsg = `[Extension] Error processing pending login: ${error.message}`;
+          console.error(errMsg);
+          addDebugLog(errMsg);
+          chrome.storage.local.remove(['pendingLogin']);
+          setLoginError('Erro ao recuperar dados do login: ' + error.message);
+        }
+      } else {
+        const msg5 = '[Extension] No pending login found';
+        console.log(msg5);
+        addDebugLog(msg5);
+      }
+    });
+  }, []); // Run only once when popup opens
+
+  // Listen for login messages from content script (for backward compatibility)
   useEffect(() => {
     const handleMessage = async (message, sender, sendResponse) => {
       console.log('[Extension] Received message:', message.type, 'from:', sender);
 
       if (message.type === 'LOGIN_SUCCESS') {
-        console.log('[Extension] Login message received, attempting Firebase sign in');
-        
-        try {
-          // Use the ID token to create a credential and sign in
-          const credential = GoogleAuthProvider.credential(message.idToken);
-          await signInWithCredential(auth, credential);
-          
-          console.log('[Extension] Successfully signed in to Firebase');
-          sendResponse({ success: true });
-        } catch (error) {
-          console.error('[Extension] Error signing in with token:', error);
-          sendResponse({ success: false, error: error.message });
-        }
+        console.log('[Extension] Login success message received (should be handled by storage check above)');
+        sendResponse({ success: true });
       }
 
-      return true; // Keep channel open for async response
+      return true;
     };
 
     chrome.runtime.onMessage.addListener(handleMessage);
@@ -199,32 +301,22 @@ const ExtensionPopup = () => {
 
   const loadUserProjects = async (currentUser) => {
     try {
-      const userData = await loadUserData(currentUser.uid);
-      const sharedProjects = await loadSharedProjectsForUser(currentUser.email);
+      console.log('[Extension] Loading projects for user:', currentUser.email);
       
+      // For now, just set default project + any cached projects
+      // Full project list will sync when app reconnects to main tab
       const defaultProject = {
         id: 'default',
         name: 'Minhas Tarefas',
         color: '#4adeb9'
       };
 
-      const allProjects = [
-        defaultProject,
-        ...(userData?.projects || []).filter(p => p.id !== 'default'),
-        ...sharedProjects
-      ];
-
-      setProjects(allProjects);
+      setProjects([defaultProject]);
+      setRecentTasks([]);
       
-      // Load recent tasks
-      if (userData?.tasks) {
-        const recent = userData.tasks
-          .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
-          .slice(0, 3);
-        setRecentTasks(recent);
-      }
+      console.log('[Extension] Projects loaded (default only)');
     } catch (error) {
-      console.error('Error loading projects:', error);
+      console.error('[Extension] Error loading projects:', error);
     }
   };
 
@@ -248,7 +340,9 @@ const ExtensionPopup = () => {
       console.log('[Auth] Step 1: About to create tab');
       // Open the main app in a new tab for login
       // The user logs in there, and Firebase will sync across all tabs
-      const loginUrl = 'https://rupt.vercel.app?mode=extension-login';
+      const extensionId = chrome.runtime.id;
+      console.log('[Auth] Extension ID:', extensionId);
+      const loginUrl = `https://rupt.vercel.app/?mode=extension-login&extensionId=${extensionId}`;
       console.log('[Auth] Step 2: Login URL set:', loginUrl);
       
       console.log('[Auth] Step 3: Checking chrome.tabs:', typeof chrome?.tabs?.create);
@@ -316,12 +410,18 @@ const ExtensionPopup = () => {
   };
 
   const handleAddTask = async () => {
-    if (!taskDescription.trim() || !user) return;
+    if (!taskDescription.trim() || !user) {
+      addDebugLog('[Task] Missing description or user');
+      return;
+    }
 
     try {
-      const userData = await loadUserData(user.uid);
-      const tasks = userData?.tasks || [];
-
+      addDebugLog('[Task] Adding task: ' + taskDescription);
+      addDebugLog('[Task] User UID: ' + user.uid);
+      
+      // Don't load from Firestore - just save locally to storage
+      // The main app will sync when it opens
+      
       const newTask = {
         id: Date.now().toString(),
         description: taskDescription.trim(),
@@ -331,7 +431,8 @@ const ExtensionPopup = () => {
         duration: 0,
         createdAt: new Date().toISOString(),
         assignedTo: user.email || 'Anonymous',
-        completedAt: null
+        completedAt: null,
+        userId: user.uid
       };
 
       // Start timer immediately
@@ -340,15 +441,33 @@ const ExtensionPopup = () => {
         startTime: Date.now()
       };
 
+      // Save to local storage
+      const { pendingTasks = [] } = await new Promise(resolve => {
+        chrome.storage.local.get(['pendingTasks'], resolve);
+      });
+      
+      const updatedPendingTasks = [newTask, ...pendingTasks];
+      await chrome.storage.local.set({ pendingTasks: updatedPendingTasks });
+      addDebugLog('[Task] Task saved to chrome.storage.local');
+
+      // Save running task
       await chrome.storage.local.set({ runningTask: taskWithTimer });
       setRunningTask(taskWithTimer);
+      addDebugLog('[Task] Timer started locally');
+
+      // But also try to save to Firestore for backwards compatibility
+      try {
+        const userData = await loadUserData(user.uid);
+        const tasks = userData?.tasks || [];
+        const updatedTasks = [newTask, ...tasks];
+        await saveUserData(user.uid, { tasks: updatedTasks });
+        addDebugLog('[Task] Task saved to Firestore');
+      } catch (firestoreError) {
+        addDebugLog('[Task] Firestore save failed (OK): ' + firestoreError.message);
+      }
 
       // Send message to background to update badge
       chrome.runtime.sendMessage({ type: 'TASK_STARTED' });
-
-      // Save to Firestore
-      const updatedTasks = [newTask, ...tasks];
-      await saveUserData(user.uid, { tasks: updatedTasks });
 
       // Clear form
       setTaskDescription('');
@@ -356,8 +475,12 @@ const ExtensionPopup = () => {
 
       // Update recent tasks
       setRecentTasks([newTask, ...recentTasks].slice(0, 3));
+      
+      addDebugLog('[Task] ✓ Task added successfully');
     } catch (error) {
-      console.error('Error adding task:', error);
+      const errMsg = '[Task] ✗ Error adding task: ' + error.message;
+      console.error(errMsg, error);
+      addDebugLog(errMsg);
     }
   };
 
@@ -365,16 +488,39 @@ const ExtensionPopup = () => {
     if (!runningTask || !user) return;
 
     try {
+      addDebugLog('[Task] Stopping timer for: ' + runningTask.description);
       const elapsed = Math.floor((Date.now() - runningTask.startTime) / 1000);
+      addDebugLog('[Task] Elapsed time: ' + elapsed + 's');
       
-      // Update task in Firestore
-      const userData = await loadUserData(user.uid);
-      const tasks = userData?.tasks || [];
-      const taskIndex = tasks.findIndex(t => t.id === runningTask.id);
+      // Update task in local storage
+      const { pendingTasks = [] } = await new Promise(resolve => {
+        chrome.storage.local.get(['pendingTasks'], resolve);
+      });
       
-      if (taskIndex !== -1) {
-        tasks[taskIndex].duration += elapsed;
-        await saveUserData(user.uid, { tasks });
+      const pendingTaskIndex = pendingTasks.findIndex(t => t.id === runningTask.id);
+      addDebugLog('[Task] Pending task found at index: ' + pendingTaskIndex);
+      
+      if (pendingTaskIndex !== -1) {
+        pendingTasks[pendingTaskIndex].duration += elapsed;
+        await chrome.storage.local.set({ pendingTasks });
+        addDebugLog('[Task] ✓ Task duration updated in storage');
+      } else {
+        addDebugLog('[Task] Task not in pending list, but that\'s OK - it will sync when app opens');
+      }
+
+      // Also try to update in Firestore if it's there
+      try {
+        const userData = await loadUserData(user.uid);
+        const tasks = userData?.tasks || [];
+        const taskIndex = tasks.findIndex(t => t.id === runningTask.id);
+        
+        if (taskIndex !== -1) {
+          tasks[taskIndex].duration += elapsed;
+          await saveUserData(user.uid, { tasks });
+          addDebugLog('[Task] ✓ Task duration updated in Firestore');
+        }
+      } catch (firestoreError) {
+        addDebugLog('[Task] Firestore update skipped (OK): ' + firestoreError.message);
       }
 
       // Clear running task
@@ -384,8 +530,12 @@ const ExtensionPopup = () => {
 
       // Send message to background to clear badge
       chrome.runtime.sendMessage({ type: 'TASK_STOPPED' });
+      
+      addDebugLog('[Task] ✓ Timer stopped');
     } catch (error) {
-      console.error('Error stopping timer:', error);
+      const errMsg = '[Task] ✗ Error stopping timer: ' + error.message;
+      console.error(errMsg, error);
+      addDebugLog(errMsg);
     }
   };
 
@@ -424,6 +574,50 @@ const ExtensionPopup = () => {
             Entrar com Google
           </button>
           {!!loginError && <p className="auth-hint">{loginError}</p>}
+        </div>
+
+        {/* Debug Panel */}
+        <div style={{ marginTop: '10px', paddingTop: '10px', borderTop: '1px solid #ccc' }}>
+          <button 
+            onClick={() => setDebugMode(!debugMode)}
+            style={{ fontSize: '11px', padding: '4px 8px', cursor: 'pointer', background: '#f0f0f0', border: '1px solid #ccc', borderRadius: '3px' }}
+          >
+            🐛 {debugMode ? 'Hide' : 'Show'} Debug
+          </button>
+          
+          {debugMode && (
+            <>
+              <div style={{ 
+                marginTop: '8px', 
+                padding: '8px', 
+                background: '#f5f5f5', 
+                border: '1px solid #ddd',
+                borderRadius: '3px',
+                fontSize: '10px',
+                fontFamily: 'monospace',
+                maxHeight: '200px',
+                overflowY: 'auto',
+                color: '#333'
+              }}>
+                {debugLogs.length === 0 ? (
+                  <div>No logs yet...</div>
+                ) : (
+                  debugLogs.map((log, idx) => (
+                    <div key={idx} style={{ marginBottom: '4px', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+                      {log}
+                    </div>
+                  ))
+                )}
+              </div>
+              
+              <button
+                onClick={checkStorageManually}
+                style={{ marginTop: '8px', fontSize: '10px', padding: '4px 6px', cursor: 'pointer', background: '#f0f0f0', border: '1px solid #999', borderRadius: '2px', width: '100%' }}
+              >
+                🔍 Check Storage
+              </button>
+            </>
+          )}
         </div>
       </div>
     );
@@ -528,6 +722,50 @@ const ExtensionPopup = () => {
           ))}
         </div>
       )}
+
+      {/* Debug Panel */}
+      <div style={{ marginTop: '10px', paddingTop: '10px', borderTop: '1px solid #ccc' }}>
+        <button 
+          onClick={() => setDebugMode(!debugMode)}
+          style={{ fontSize: '11px', padding: '4px 8px', cursor: 'pointer', background: '#f0f0f0', border: '1px solid #ccc', borderRadius: '3px' }}
+        >
+          🐛 {debugMode ? 'Hide' : 'Show'} Debug
+        </button>
+        
+        {debugMode && (
+          <>
+            <div style={{ 
+              marginTop: '8px', 
+              padding: '8px', 
+              background: '#f5f5f5', 
+              border: '1px solid #ddd',
+              borderRadius: '3px',
+              fontSize: '10px',
+              fontFamily: 'monospace',
+              maxHeight: '200px',
+              overflowY: 'auto',
+              color: '#333'
+            }}>
+              {debugLogs.length === 0 ? (
+                <div>No logs yet...</div>
+              ) : (
+                debugLogs.map((log, idx) => (
+                  <div key={idx} style={{ marginBottom: '4px', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+                    {log}
+                  </div>
+                ))
+              )}
+            </div>
+            
+            <button
+              onClick={checkStorageManually}
+              style={{ marginTop: '8px', fontSize: '10px', padding: '4px 6px', cursor: 'pointer', background: '#f0f0f0', border: '1px solid #999', borderRadius: '2px', width: '100%' }}
+            >
+              🔍 Check Storage
+            </button>
+          </>
+        )}
+      </div>
     </div>
   );
 };

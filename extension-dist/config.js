@@ -1,0 +1,11 @@
+// Auto-generated config file - DO NOT EDIT
+export const ENV_CONFIG = {
+  VITE_GOOGLE_OAUTH_CLIENT_ID: "654858776071-3undackiom6h82ru2lk4919jsqa07343.apps.googleusercontent.com",
+  VITE_FIREBASE_API_KEY: "AIzaSyAhrbdVvOJhWRmd6MhS6R1IqAmxu5eo3ok",
+  VITE_FIREBASE_AUTH_DOMAIN: "rupt-d23ed.firebaseapp.com",
+  VITE_FIREBASE_PROJECT_ID: "rupt-d23ed",
+  VITE_FIREBASE_STORAGE_BUCKET: "rupt-d23ed.firebasestorage.app",
+  VITE_FIREBASE_MESSAGING_SENDER_ID: "654858776071",
+  VITE_FIREBASE_APP_ID: "1:654858776071:web:77ff8dc409bb780fcc04a2",
+  VITE_FIREBASE_MEASUREMENT_ID: "G-K104QEMZYS",
+};
