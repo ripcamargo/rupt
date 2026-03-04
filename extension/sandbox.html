@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="Content-Security-Policy" content="script-src https://apis.google.com https://www.google.com https://www.gstatic.com; style-src 'unsafe-inline'; frame-src https://accounts.google.com https://*.firebaseapp.com">
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+  </style>
+</head>
+<body>
+  <script src="https://apis.google.com/js/api.js"></script>
+  <script src="https://www.google.com/recaptcha/api.js"></script>
+  <script>
+    // Expose gapi and grecaptcha to parent window
+    window.addEventListener('load', () => {
+      window.parent.postMessage({ 
+        type: 'SANDBOX_READY',
+        hasGapi: typeof window.gapi !== 'undefined',
+        hasGreCaptcha: typeof window.grecaptcha !== 'undefined'
+      }, '*');
+    });
+  </script>
+</body>
+</html>"

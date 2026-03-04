@@ -22,8 +22,7 @@
     "storage",
     "notifications",
     "alarms",
-    "tabs",
-    "identity"
+    "tabs"
   ],
   "host_permissions": [
     "https://*.firebaseapp.com/*",
@@ -45,8 +44,14 @@
     "matches": ["https://rupt.vercel.app/*", "http://localhost:5174/*"]
   },
   "content_security_policy": {
-    "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; object-src 'self'; frame-src https://accounts.google.com https://*.firebaseapp.com; connect-src 'self' https://*.google.com https://*.googleapis.com https://*.firebaseapp.com https://securetoken.googleapis.com https://identitytoolkit.googleapis.com"
+    "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; object-src 'self'; frame-src https://accounts.google.com https://*.firebaseapp.com; connect-src 'self' https://*.google.com https://*.googleapis.com https://*.firebaseapp.com https://securetoken.googleapis.com https://identitytoolkit.googleapis.com https://www.google.com https://www.gstatic.com"
   },
+  "web_accessible_resources": [
+    {
+      "resources": ["popup.js", "load-config.js"],
+      "matches": ["<all_urls>"]
+    }
+  ],
   "commands": {
     "_execute_action": {
       "suggested_key": {

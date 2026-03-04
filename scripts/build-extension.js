@@ -100,6 +100,13 @@ fs.copyFileSync(
   path.join(distDir, 'load-config.js')
 );
 
+// Copy init.js
+console.log('✓ Copying init.js');
+fs.copyFileSync(
+  path.join(extensionDir, 'init.js'),
+  path.join(distDir, 'init.js')
+);
+
 // Copy manifest.json
 console.log('✓ Copying manifest.json');
 fs.copyFileSync(
