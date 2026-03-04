@@ -65,6 +65,14 @@ function Sidebar({ isOpen, onClose, projects, activeProjectId, onSelectProject, 
             ))}
           </div>
 
+          <div className="shared-projects-notice">
+            <p>
+              Os projetos compartilhados ainda não estão funcionando totalmente. :( 
+              <br />
+              Enquanto os bugs são resolvidos, procure utilizar o "Minhas Tarefas".
+            </p>
+          </div>
+
           {isCreating ? (
             <div className="create-project-form">
               <input

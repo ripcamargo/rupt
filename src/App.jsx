@@ -411,6 +411,18 @@ function AppContent() {
     return () => unsubscribe();
   }, []);
 
+  // Check if extension login mode is active (opened from chrome extension popup)
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    if (params.get('mode') === 'extension-login') {
+      console.log('[Extension Login] Detected extension-login mode, opening auth modal');
+      // If not logged in, open auth modal. If already logged in, close this tab (the extension will detect it)
+      if (!user && !authLoading) {
+        setIsAuthModalOpen(true);
+      }
+    }
+  }, [location.search, user, authLoading]);
+
   // Refresh shared projects when user returns to the app (so new invites appear without re-login)
   useEffect(() => {
     if (!user || authLoading) return;
