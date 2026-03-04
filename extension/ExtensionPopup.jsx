@@ -3,6 +3,7 @@ import { auth, firebaseInitError } from '../src/utils/firebase';
 import { onAuthStateChanged, signInWithCredential, GoogleAuthProvider, signOut } from 'firebase/auth';
 import { loadUserData, saveUserData, loadSharedProjectsForUser } from '../src/utils/firestore';
 import { formatTime } from '../src/utils/timeFormatter';
+import './styles/popup.css';
 
 // Try to get GOOGLE_OAUTH_CLIENT_ID from window.ENV_CONFIG (set by popup.html)
 // Fallback to import.meta.env for development
@@ -592,57 +593,48 @@ const ExtensionPopup = () => {
         </div>
         
         <div className="auth-section">
-          <p className="auth-message">Faça login para adicionar tarefas</p>
-          <p className="auth-submessage">Login nativo da extensão (Google OAuth)</p>
+          <div>
+            <p className="auth-message">Bem-vindo!</p>
+            <p className="auth-submessage">Faça login para começar a cronometrar suas tarefas</p>
+          </div>
+          
           <button onClick={(e) => {
             console.log('[UI] Login button clicked, event:', e);
             handleLogin();
-          }} className="btn btn-primary">
+          }} className="btn btn-primary btn-full">
             <span className="google-icon">G</span>
             Entrar com Google
           </button>
-          {!!loginError && <p className="auth-hint">{loginError}</p>}
+          
+          {!!loginError && <p className="auth-hint">⚠️ {loginError}</p>}
         </div>
 
         {/* Debug Panel */}
-        <div style={{ marginTop: '10px', paddingTop: '10px', borderTop: '1px solid #ccc' }}>
+        <div className="debug-panel">
           <button 
             onClick={() => setDebugMode(!debugMode)}
-            style={{ fontSize: '11px', padding: '4px 8px', cursor: 'pointer', background: '#f0f0f0', border: '1px solid #ccc', borderRadius: '3px' }}
+            className="debug-toggle"
           >
-            🐛 {debugMode ? 'Hide' : 'Show'} Debug
+            🐛 {debugMode ? 'Ocultar' : 'Mostrar'} Debug
           </button>
           
           {debugMode && (
             <>
-              <div style={{ 
-                marginTop: '8px', 
-                padding: '8px', 
-                background: '#f5f5f5', 
-                border: '1px solid #ddd',
-                borderRadius: '3px',
-                fontSize: '10px',
-                fontFamily: 'monospace',
-                maxHeight: '200px',
-                overflowY: 'auto',
-                color: '#333'
-              }}>
+              <div className="debug-logs">
                 {debugLogs.length === 0 ? (
-                  <div>No logs yet...</div>
+                  <div className="debug-log-item">Sem logs...</div>
                 ) : (
                   debugLogs.map((log, idx) => (
-                    <div key={idx} style={{ marginBottom: '4px', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
-                      {log}
-                    </div>
+                    <div key={idx} className="debug-log-item">{log}</div>
                   ))
                 )}
               </div>
               
               <button
                 onClick={checkStorageManually}
-                style={{ marginTop: '8px', fontSize: '10px', padding: '4px 6px', cursor: 'pointer', background: '#f0f0f0', border: '1px solid #999', borderRadius: '2px', width: '100%' }}
+                className="debug-storage-btn"
               >
-                🔍 Check Storage
+                🔍 Verificar Storage
               </button>
             </>
           )}
@@ -656,7 +648,7 @@ const ExtensionPopup = () => {
       <div className="header">
         <div className="user-section">
           <img 
-            src={user.photoURL || 'https://via.placeholder.com/32'} 
+            src={user.photoURL || 'https://via.placeholder.com/40'} 
             alt="User" 
             className="user-avatar"
           />
@@ -676,16 +668,16 @@ const ExtensionPopup = () => {
           <div className="task-info">
             <p className="task-description">{runningTask.description}</p>
             {runningTask.details && (
-              <p className="task-details">{runningTask.details}</p>
+              <p className="task-details">💡 {runningTask.details}</p>
             )}
           </div>
-          <button onClick={handleStopTimer} className="btn btn-danger">
+          <button onClick={handleStopTimer} className="btn btn-danger btn-full">
             ⏹️ Parar Timer
           </button>
         </div>
       ) : (
         <div className="quick-add-section">
-          <h2 className="section-title">Iniciar Nova Tarefa</h2>
+          <h2 className="section-title">✨ Iniciar Nova Tarefa</h2>
           
           <div className="form-group">
             <input
@@ -733,15 +725,9 @@ const ExtensionPopup = () => {
         </div>
       )}
 
-      <div className="footer">
-        <button onClick={handleOpenApp} className="btn-link btn-open-app">
-          🔗 Abrir App Completo
-        </button>
-      </div>
-
       {recentTasks.length > 0 && !runningTask && (
         <div className="recent-tasks">
-          <h3 className="recent-title">Recentes</h3>
+          <h3 className="recent-title">📋 Recentes</h3>
           {recentTasks.map(task => (
             <div key={task.id} className="recent-task-item">
               <span className="recent-task-description">{task.description || 'Sem título'}</span>
@@ -751,45 +737,38 @@ const ExtensionPopup = () => {
         </div>
       )}
 
+      <div className="footer">
+        <button onClick={handleOpenApp} className="btn-link btn-open-app">
+          🔗 Abrir App Completo
+        </button>
+      </div>
+
       {/* Debug Panel */}
-      <div style={{ marginTop: '10px', paddingTop: '10px', borderTop: '1px solid #ccc' }}>
+      <div className="debug-panel">
         <button 
           onClick={() => setDebugMode(!debugMode)}
-          style={{ fontSize: '11px', padding: '4px 8px', cursor: 'pointer', background: '#f0f0f0', border: '1px solid #ccc', borderRadius: '3px' }}
+          className="debug-toggle"
         >
-          🐛 {debugMode ? 'Hide' : 'Show'} Debug
+          🐛 {debugMode ? 'Ocultar' : 'Mostrar'} Debug
         </button>
         
         {debugMode && (
           <>
-            <div style={{ 
-              marginTop: '8px', 
-              padding: '8px', 
-              background: '#f5f5f5', 
-              border: '1px solid #ddd',
-              borderRadius: '3px',
-              fontSize: '10px',
-              fontFamily: 'monospace',
-              maxHeight: '200px',
-              overflowY: 'auto',
-              color: '#333'
-            }}>
+            <div className="debug-logs">
               {debugLogs.length === 0 ? (
-                <div>No logs yet...</div>
+                <div className="debug-log-item">Sem logs...</div>
               ) : (
                 debugLogs.map((log, idx) => (
-                  <div key={idx} style={{ marginBottom: '4px', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
-                    {log}
-                  </div>
+                  <div key={idx} className="debug-log-item">{log}</div>
                 ))
               )}
             </div>
             
             <button
               onClick={checkStorageManually}
-              style={{ marginTop: '8px', fontSize: '10px', padding: '4px 6px', cursor: 'pointer', background: '#f0f0f0', border: '1px solid #999', borderRadius: '2px', width: '100%' }}
+              className="debug-storage-btn"
             >
-              🔍 Check Storage
+              🔍 Verificar Storage
             </button>
           </>
         )}
