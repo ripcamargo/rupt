@@ -414,11 +414,51 @@ function AppContent() {
   // Check if extension login mode is active (opened from chrome extension popup)
   useEffect(() => {
     const params = new URLSearchParams(location.search);
-    if (params.get('mode') === 'extension-login') {
-      console.log('[Extension Login] Detected extension-login mode, opening auth modal');
-      // If not logged in, open auth modal. If already logged in, close this tab (the extension will detect it)
+    const isExtensionLogin = params.get('mode') === 'extension-login';
+    
+    if (isExtensionLogin) {
+      console.log('[Extension Login] Detected extension-login mode');
+      
+      // If not logged in, open auth modal
       if (!user && !authLoading) {
+        console.log('[Extension Login] User not logged in, opening auth modal');
         setIsAuthModalOpen(true);
+      }
+      
+      // If user just logged in successfully, send credentials to extension
+      if (user && !authLoading) {
+        console.log('[Extension Login] User logged in, sending credentials to extension');
+        
+        user.getIdToken().then((idToken) => {
+          console.log('[Extension Login] Got ID token, sending to extension');
+          
+          // Send message to extension
+          if (window.chrome?.runtime) {
+            // Try to send to extension with known ID
+            const message = {
+              type: 'LOGIN_SUCCESS',
+              idToken: idToken,
+              user: {
+                uid: user.uid,
+                email: user.email,
+                displayName: user.displayName,
+                photoURL: user.photoURL,
+              }
+            };
+            
+            console.log('[Extension Login] Attempting to send message to extension:', message.type);
+            
+            // Broadcast to extension (try common extension message pattern)
+            window.postMessage({ 
+              source: 'rupt-extension-login',
+              ...message 
+            }, '*');
+            
+            console.log('[Extension Login] Message posted, tab should close soon');
+          }
+        }).catch((error) => {
+          console.error('[Extension Login] Error getting ID token:', error);
+        });
       }
     }
   }, [location.search, user, authLoading]);

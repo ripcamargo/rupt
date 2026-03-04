@@ -1,0 +1,21 @@
+<svg width="128" height="128" viewBox="0 0 128 128" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background Circle -->
+  <circle cx="64" cy="64" r="64" fill="url(#gradient)"/>
+  
+  <!-- Lightning Bolt (Rupt Logo) -->
+  <path d="M75 30L45 70H60L53 98L83 58H68L75 30Z" fill="white" stroke="#1a1a1a" stroke-width="2" stroke-linejoin="round"/>
+  
+  <!-- Clock accent -->
+  <circle cx="90" cy="90" r="18" fill="#1a1a1a" opacity="0.8"/>
+  <circle cx="90" cy="90" r="14" fill="white"/>
+  <line x1="90" y1="90" x2="90" y2="82" stroke="#1a1a1a" stroke-width="2" stroke-linecap="round"/>
+  <line x1="90" y1="90" x2="95" y2="90" stroke="#1a1a1a" stroke-width="2" stroke-linecap="round"/>
+  
+  <!-- Gradient Definition -->
+  <defs>
+    <linearGradient id="gradient" x1="0" y1="0" x2="128" y2="128" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#4adeb9"/>
+      <stop offset="100%" stop-color="#3da58a"/>
+    </linearGradient>
+  </defs>
+</svg>
