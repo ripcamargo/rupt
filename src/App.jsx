@@ -506,13 +506,17 @@ function AppContent() {
 
   // Listen for pending tasks from extension via content script
   useEffect(() => {
+    console.log('[App] Setting up message listener for extension...');
+    
     const handleExtensionMessage = async (event) => {
       // Only accept from our own window
       if (event.source !== window) return;
       
+      console.log('[App] Received postMessage:', event.data?.source, event.data?.type);
+      
       // Check if this is a pending tasks message from content script
       if (event.data && event.data.source === 'rupt-extension-sync' && event.data.type === 'PENDING_TASKS') {
-        console.log('[App] Received pending tasks from extension:', event.data.pendingTasks?.length || 0);
+        console.log('[App] ✓ Received pending tasks from extension:', event.data.pendingTasks?.length || 0);
         
         if (!user) {
           console.log('[App] User not logged in yet, skipping sync');
@@ -559,63 +563,13 @@ function AppContent() {
     };
 
     window.addEventListener('message', handleExtensionMessage);
-    return () => window.removeEventListener('message', handleExtensionMessage);
-  }, [user]);
-
-  // Sync pending tasks from Chrome extension when app loads
-  useEffect(() => {
-    console.log('[App] Sync effect running - user:', user?.email, 'authLoading:', authLoading);
-    if (!user || authLoading) {
-      console.log('[App] Skipping sync - user or authLoading');
-      return;
-    }
-
-    const syncExtensionPendingTasks = async () => {
-      try {
-        console.log('[App] Attempting to sync pending tasks from extension...');
-        
-        // Read pending tasks from browser localStorage
-        const pendingTasksJson = localStorage.getItem('rupt:pending-tasks');
-        const pendingTasks = pendingTasksJson ? JSON.parse(pendingTasksJson) : [];
-        
-        if (pendingTasks.length === 0) {
-          console.log('[App] No pending tasks to sync');
-          return;
-        }
-
-        console.log('[App] Found ' + pendingTasks.length + ' pending tasks from extension');
-
-        // Load user's current tasks
-        const userData = await loadUserData(user.uid);
-        let tasks = userData?.tasks || [];
-
-        // Merge pending tasks with existing tasks (avoid duplicates)
-        pendingTasks.forEach((pendingTask) => {
-          const existingIndex = tasks.findIndex(t => t.id === pendingTask.id);
-          if (existingIndex >= 0) {
-            // Update existing task (merge duration if pending task has more)
-            if (pendingTask.duration > tasks[existingIndex].duration) {
-              tasks[existingIndex].duration = pendingTask.duration;
-            }
-          } else {
-            // Add new task
-            tasks.push(pendingTask);
-          }
-        });
-
-        // Save merged tasks to Firestore
-        await saveUserData(user.uid, { tasks });
-        console.log('[App] ✓ Synced ' + pendingTasks.length + ' pending tasks to Firestore');
-
-        // Clear pending tasks from storage after sync
-        localStorage.removeItem('rupt:pending-tasks');
-      } catch (error) {
-        console.log('[App] Sync error:', error.message);
-      }
+    console.log('[App] Message listener registered');
+    
+    return () => {
+      window.removeEventListener('message', handleExtensionMessage);
+      console.log('[App] Message listener removed');
     };
-
-    syncExtensionPendingTasks();
-  }, [user, authLoading]);
+  }, [user]);
 
   // Refresh shared projects when user returns to the app (so new invites appear without re-login)
   useEffect(() => {

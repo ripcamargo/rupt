@@ -15,13 +15,16 @@ function syncPendingTasksWithApp() {
     console.log('[Rupt Extension Content Script] Received ' + pendingTasks.length + ' pending tasks from background');
     
     if (pendingTasks.length > 0) {
-      // Send to app via postMessage
-      window.postMessage({
-        source: 'rupt-extension-sync',
-        type: 'PENDING_TASKS',
-        pendingTasks: pendingTasks
-      }, '*');
-      console.log('[Rupt Extension Content Script] Sent pending tasks to app');
+      // Wait a bit for React to mount and attach listeners
+      setTimeout(() => {
+        console.log('[Rupt Extension Content Script] Sending ' + pendingTasks.length + ' pending tasks to app...');
+        window.postMessage({
+          source: 'rupt-extension-sync',
+          type: 'PENDING_TASKS',
+          pendingTasks: pendingTasks
+        }, '*');
+        console.log('[Rupt Extension Content Script] Sent pending tasks to app');
+      }, 500);
     }
   });
 }
