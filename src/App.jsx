@@ -516,29 +516,9 @@ function AppContent() {
       try {
         console.log('[App] Attempting to sync pending tasks from extension...');
         
-        // Check if running in extension/chrome context
-        if (typeof chrome?.storage?.local === 'undefined') {
-          console.log('[App] No chrome.storage.local available (normal webpage context) - skipping sync');
-          return; // Not in extension context
-        }
-
-        console.log('[App] chrome.storage.local is available, attempting get...');
-        
-        const result = await new Promise((resolve, reject) => {
-          try {
-            chrome.storage.local.get(['pendingTasks'], (result) => {
-              if (chrome.runtime.lastError) {
-                reject(new Error(chrome.runtime.lastError.message));
-              } else {
-                resolve(result);
-              }
-            });
-          } catch (e) {
-            reject(e);
-          }
-        });
-
-        const { pendingTasks = [] } = result;
+        // Read pending tasks from browser localStorage
+        const pendingTasksJson = localStorage.getItem('rupt:pending-tasks');
+        const pendingTasks = pendingTasksJson ? JSON.parse(pendingTasksJson) : [];
         
         if (pendingTasks.length === 0) {
           console.log('[App] No pending tasks to sync');
@@ -570,9 +550,9 @@ function AppContent() {
         console.log('[App] ✓ Synced ' + pendingTasks.length + ' pending tasks to Firestore');
 
         // Clear pending tasks from storage after sync
-        chrome.storage.local.remove(['pendingTasks']);
+        localStorage.removeItem('rupt:pending-tasks');
       } catch (error) {
-        console.log('[App] Sync error (this is OK on regular webpage):', error.message);
+        console.log('[App] Sync error:', error.message);
       }
     };
 

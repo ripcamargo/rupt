@@ -403,7 +403,7 @@ const ExtensionPopup = () => {
     try {
       await signOut(auth);
       setRunningTask(null);
-      chrome.storage.local.remove(['runningTask']);
+      localStorage.removeItem('rupt:running-task');
     } catch (error) {
       console.error('Logout error:', error);
     }
@@ -441,17 +441,14 @@ const ExtensionPopup = () => {
         startTime: Date.now()
       };
 
-      // Save to local storage
-      const { pendingTasks = [] } = await new Promise(resolve => {
-        chrome.storage.local.get(['pendingTasks'], resolve);
-      });
-      
+      // Save to browser localStorage
+      const pendingTasks = JSON.parse(localStorage.getItem('rupt:pending-tasks') || '[]');
       const updatedPendingTasks = [newTask, ...pendingTasks];
-      await chrome.storage.local.set({ pendingTasks: updatedPendingTasks });
-      addDebugLog('[Task] Task saved to chrome.storage.local');
+      localStorage.setItem('rupt:pending-tasks', JSON.stringify(updatedPendingTasks));
+      addDebugLog('[Task] Task saved to localStorage');
 
       // Save running task
-      await chrome.storage.local.set({ runningTask: taskWithTimer });
+      localStorage.setItem('rupt:running-task', JSON.stringify(taskWithTimer));
       setRunningTask(taskWithTimer);
       addDebugLog('[Task] Timer started locally');
 
@@ -492,17 +489,15 @@ const ExtensionPopup = () => {
       const elapsed = Math.floor((Date.now() - runningTask.startTime) / 1000);
       addDebugLog('[Task] Elapsed time: ' + elapsed + 's');
       
-      // Update task in local storage
-      const { pendingTasks = [] } = await new Promise(resolve => {
-        chrome.storage.local.get(['pendingTasks'], resolve);
-      });
+      // Update task in localStorage
+      const pendingTasks = JSON.parse(localStorage.getItem('rupt:pending-tasks') || '[]');
       
       const pendingTaskIndex = pendingTasks.findIndex(t => t.id === runningTask.id);
       addDebugLog('[Task] Pending task found at index: ' + pendingTaskIndex);
       
       if (pendingTaskIndex !== -1) {
         pendingTasks[pendingTaskIndex].duration += elapsed;
-        await chrome.storage.local.set({ pendingTasks });
+        localStorage.setItem('rupt:pending-tasks', JSON.stringify(pendingTasks));
         addDebugLog('[Task] ✓ Task duration updated in storage');
       } else {
         addDebugLog('[Task] Task not in pending list, but that\'s OK - it will sync when app opens');
@@ -524,7 +519,7 @@ const ExtensionPopup = () => {
       }
 
       // Clear running task
-      await chrome.storage.local.remove(['runningTask']);
+      localStorage.removeItem('rupt:running-task');
       setRunningTask(null);
       setElapsedTime(0);
 
