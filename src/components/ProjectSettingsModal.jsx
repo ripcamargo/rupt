@@ -31,7 +31,7 @@ function ProjectSettingsModal({ isOpen, onClose, project, currentUserId, user, o
       setCopySuccess(false);
       setLocalInviteEnabled(project.inviteEnabled !== false);
     }
-  }, [project?.id, isOpen]);
+  }, [project?.id, isOpen, project?.members?.length]);
 
   const isAdmin = currentUserId === project?.adminId;
   const isDefaultProject = project?.id === 'default';

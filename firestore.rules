@@ -88,10 +88,6 @@ service cloud.firestore {
         && userEmail() != null
         && !(userEmail().lower() in resource.data.memberEmails)
         && request.resource.data.adminId == resource.data.adminId
-        && request.resource.data.adminEmail == resource.data.adminEmail
-        && request.resource.data.name == resource.data.name
-        && request.resource.data.id == resource.data.id
-        && request.resource.data.inviteEnabled == resource.data.inviteEnabled
         && request.resource.data.memberEmails.size() == resource.data.memberEmails.size() + 1
         && request.resource.data.members.size() == resource.data.members.size() + 1
         && userEmail().lower() in request.resource.data.memberEmails;

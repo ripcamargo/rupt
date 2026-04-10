@@ -665,13 +665,16 @@ function AppContent() {
         isReceivingFromListenerRef.current = true;
         
         // Update members if changed
-        setProjects((prevProjects) =>
-          prevProjects.map((p) =>
+        setProjects((prevProjects) => {
+          const updated = prevProjects.map((p) =>
             p.id === activeProjectId
               ? { ...p, members: sharedMembers, memberEmails: sharedMemberEmails }
               : p
-          )
-        );
+          );
+          // Persist updated member list to localStorage so admin sees it on reload
+          localStorage.setItem('rupt_projects', JSON.stringify(updated));
+          return updated;
+        });
         
         // Deduplicate incoming tasks (safety check)
         const uniqueSharedTasks = deduplicateTasks(sharedProjectTasks);
@@ -1980,7 +1983,7 @@ function AppContent() {
       <ProjectSettingsModal
         isOpen={isProjectSettingsOpen}
         onClose={() => setIsProjectSettingsOpen(false)}
-        project={selectedProjectForSettings}
+        project={selectedProjectForSettings ? (projects.find(p => p.id === selectedProjectForSettings.id) || selectedProjectForSettings) : null}
         currentUserId={user?.uid || 'local_user'}
         user={user}
         onOpenAuth={handleOpenAuth}
