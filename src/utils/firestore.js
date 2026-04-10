@@ -181,7 +181,8 @@ export const onUserTasksChange = (uid, callback) => {
 };
 
 // Save tasks to shared project
-export const saveSharedProjectTasks = async (projectId, tasks) => {  try {
+export const saveSharedProjectTasks = async (projectId, tasks) => {
+  try {
     const projectRef = doc(db, 'sharedProjects', projectId);
     console.log(`Saving ${tasks.length} tasks to shared project ${projectId}`);
     await setDoc(projectRef, {
@@ -191,7 +192,7 @@ export const saveSharedProjectTasks = async (projectId, tasks) => {  try {
     console.log(`Successfully saved tasks to shared project ${projectId}`);
   } catch (error) {
     console.error('Failed to save shared project tasks:', error);
-    throw error;
+    // Non-fatal: don't throw so callers can continue
   }
 };
 

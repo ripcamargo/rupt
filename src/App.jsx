@@ -1072,13 +1072,16 @@ function AppContent() {
     if (isSharedProject && updatedProject.id !== 'default') {
       console.log('Saving shared project with members:', updatedProject.members);
       
-      // Save tasks FIRST to avoid the listener receiving empty tasks when the
-      // project document is overwritten. Both writes use merge:true.
+      // Save the project document FIRST (creates it if it doesn't exist yet).
+      // saveSharedProjectTasks uses merge:true which Firestore treats as a CREATE
+      // if the document doesn't exist — that would fail the create rule because
+      // it doesn't include the required id/adminId fields.
+      await saveSharedProject(updatedProject);
+
+      // Now save tasks (document already exists, so this is always an UPDATE).
       const projectTasks = tasks.filter(t => t.projectId === updatedProject.id);
       console.log(`Saving ${projectTasks.length} tasks for shared project ${updatedProject.id}`);
       await saveSharedProjectTasks(updatedProject.id, projectTasks);
-      
-      await saveSharedProject(updatedProject);
     }
     
     if (user) {
