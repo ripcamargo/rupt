@@ -990,8 +990,8 @@ function AppContent() {
     setProjects(updatedProjects);
     localStorage.setItem('rupt_projects', JSON.stringify(updatedProjects));
     
-    // Save to Firestore if this is a shared project (has adminEmail OR members)
-    const isSharedProject = (updatedProject.members && updatedProject.members.length > 0) || updatedProject.adminEmail;
+    // Save to Firestore if this is a shared project (has members OR has an invite token)
+    const isSharedProject = (updatedProject.members && updatedProject.members.length > 0) || !!updatedProject.inviteToken;
     if (isSharedProject && updatedProject.id !== 'default') {
       console.log('Saving shared project with members:', updatedProject.members);
       

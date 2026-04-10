@@ -35,8 +35,14 @@ function ProjectSettingsModal({ isOpen, onClose, project, currentUserId, user, o
       setShowDeleteConfirm(false);
       setShowLeaveConfirm(false);
       setCopySuccess(false);
+
+      // If the project has an invite token, force a sync to Firestore
+      // so the token is available even if it was created before the sync fix.
+      if (project.inviteToken && project.id !== 'default') {
+        onUpdate({ ...project });
+      }
     }
-  }, [project, isOpen]);
+  }, [project?.id, isOpen]);
 
   const isAdmin = currentUserId === project?.adminId;
   const isDefaultProject = project?.id === 'default';
