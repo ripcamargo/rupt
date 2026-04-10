@@ -33,8 +33,9 @@ service cloud.firestore {
     }
     
     match /sharedProjects/{projectId} {
-      // Read only for project participants
-      allow read: if isParticipant(resource.data);
+      // Read by participants, OR by anyone if the project has invite enabled
+      allow read: if isParticipant(resource.data)
+        || resource.data.inviteEnabled == true;
 
       // Create only by admin creating their own project
       allow create: if isAuthenticated()
@@ -82,6 +83,21 @@ service cloud.firestore {
 
       // Delete only by admin
       allow delete: if isAdmin(resource.data);
+
+      // Authenticated user can add themselves when invite is enabled
+      allow update: if
+        isAuthenticated()
+        && resource.data.inviteEnabled == true
+        && userEmail() != null
+        && !(userEmail().lower() in resource.data.memberEmails)
+        && request.resource.data.adminId == resource.data.adminId
+        && request.resource.data.adminEmail == resource.data.adminEmail
+        && request.resource.data.name == resource.data.name
+        && request.resource.data.id == resource.data.id
+        && request.resource.data.inviteEnabled == resource.data.inviteEnabled
+        && request.resource.data.memberEmails.size() == resource.data.memberEmails.size() + 1
+        && request.resource.data.members.size() == resource.data.members.size() + 1
+        && userEmail().lower() in request.resource.data.memberEmails;
     }
   }
 }

@@ -11,7 +11,6 @@ function ProjectSettingsModal({ isOpen, onClose, project, currentUserId, user, o
     groupByDay: true,
   });
   const [members, setMembers] = useState([]);
-  const [newMemberEmail, setNewMemberEmail] = useState('');
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
   const [copySuccess, setCopySuccess] = useState(false);
@@ -27,7 +26,6 @@ function ProjectSettingsModal({ isOpen, onClose, project, currentUserId, user, o
         groupByDay: project.groupByDay !== undefined ? project.groupByDay : true,
       });
       setMembers(project.members || []);
-      setNewMemberEmail('');
       setShowDeleteConfirm(false);
       setShowLeaveConfirm(false);
       setCopySuccess(false);
@@ -46,23 +44,6 @@ function ProjectSettingsModal({ isOpen, onClose, project, currentUserId, user, o
       ...prev,
       [name]: type === 'checkbox' ? checked : value,
     }));
-  };
-
-  const handleAddMember = (e) => {
-    e.preventDefault();
-    if (newMemberEmail.trim() && newMemberEmail.includes('@')) {
-      const newMember = {
-        email: newMemberEmail.trim().toLowerCase(),
-        name: '',
-        joinedAt: new Date().toISOString(),
-      };
-      
-      // Check if member already exists
-      if (!members.some(m => m.email === newMember.email)) {
-        setMembers([...members, newMember]);
-        setNewMemberEmail('');
-      }
-    }
   };
 
   const handleRemoveMember = (email) => {
@@ -214,41 +195,6 @@ function ProjectSettingsModal({ isOpen, onClose, project, currentUserId, user, o
               {!isDefaultProject && (
                 <div className="form-section">
                   <h3>Membros do Projeto</h3>
-                  
-                  {!user ? (
-                    <div className="form-group login-prompt">
-                      <p className="login-message">Você precisa estar logado para adicionar membros ao seu projeto</p>
-                      <button
-                        type="button"
-                        className="btn-login-prompt"
-                        onClick={onOpenAuth}
-                      >
-                        Entrar / Cadastrar
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="form-group add-member">
-                      <label htmlFor="new-member-email">Adicionar Membro</label>
-                      <div className="add-member-input-group">
-                        <input
-                          id="new-member-email"
-                          type="email"
-                          value={newMemberEmail}
-                          onChange={(e) => setNewMemberEmail(e.target.value)}
-                          onKeyPress={(e) => e.key === 'Enter' && handleAddMember(e)}
-                          placeholder="Digite o e-mail da pessoa"
-                          className="form-input"
-                        />
-                        <button
-                          type="button"
-                          className="btn-add-member"
-                          onClick={handleAddMember}
-                        >
-                          Adicionar
-                        </button>
-                      </div>
-                    </div>
-                  )}
 
                   <div className="members-list">
                     <div className="member-item admin">
