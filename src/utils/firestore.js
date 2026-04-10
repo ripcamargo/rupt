@@ -139,10 +139,10 @@ export const onSharedProjectTasksChange = (projectId, callback) => {
       if (snapshot.exists()) {
         const data = snapshot.data();
         console.log('Shared project tasks updated from listener:', projectId, 'tasks count:', data.tasks?.length || 0);
-        callback(data.tasks || []);
+        callback({ tasks: data.tasks || [], members: data.members || [], memberEmails: data.memberEmails || [] });
       } else {
         console.log('Shared project document does not exist:', projectId);
-        callback([]);
+        callback({ tasks: [], members: [], memberEmails: [] });
       }
     }, (error) => {
       console.error('Error listening to shared project tasks:', projectId, error);

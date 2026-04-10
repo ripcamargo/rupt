@@ -646,12 +646,12 @@ function AppContent() {
 
     // Determine if current project is shared (using ref to avoid dependency)
     const currentProject = projectsRef.current.find(p => p.id === activeProjectId);
-    const isSharedProject = currentProject && currentProject.members && currentProject.members.length > 0;
+    const isSharedProject = currentProject && (currentProject.members?.length > 0 || currentProject.inviteEnabled === true);
 
     if (isSharedProject && activeProjectId !== 'default') {
       // Setup listener for shared project tasks
       console.log('Setting up listener for shared project:', activeProjectId);
-      unsubscribeSharedProjectRef.current = onSharedProjectTasksChange(activeProjectId, (sharedProjectTasks) => {
+      unsubscribeSharedProjectRef.current = onSharedProjectTasksChange(activeProjectId, ({ tasks: sharedProjectTasks, members: sharedMembers, memberEmails: sharedMemberEmails }) => {
         // Prevent loop: only update if not currently receiving from listener
         if (isReceivingFromListenerRef.current) {
           console.log('Skipping update - already receiving from listener');
@@ -659,6 +659,15 @@ function AppContent() {
         }
         
         isReceivingFromListenerRef.current = true;
+        
+        // Update members if changed
+        setProjects((prevProjects) =>
+          prevProjects.map((p) =>
+            p.id === activeProjectId
+              ? { ...p, members: sharedMembers, memberEmails: sharedMemberEmails }
+              : p
+          )
+        );
         
         // Deduplicate incoming tasks (safety check)
         const uniqueSharedTasks = deduplicateTasks(sharedProjectTasks);
