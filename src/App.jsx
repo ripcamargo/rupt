@@ -3,12 +3,14 @@ import { useParams, useNavigate, useLocation, Routes, Route, Link } from 'react-
 import DayGroup from './components/DayGroup';
 import TaskItem from './components/TaskItem';
 import KanbanBoard from './components/KanbanBoard';
+import KanbanStagesBoard from './components/KanbanStagesBoard';
 import SettingsModal from './components/SettingsModal';
 import AuthModal from './components/AuthModal';
 import AuthGate from './components/AuthGate';
 import UserProfileModal from './components/UserProfileModal';
 import Sidebar from './components/Sidebar';
 import ProjectSettingsModal from './components/ProjectSettingsModal';
+import JoinProjectPage from './components/JoinProjectPage';
 import { SettingsIcon, MenuIcon, FilterIcon } from './components/Icons';
 import { formatTime } from './utils/timeFormatter';
 import { saveTasks, loadTasks } from './utils/storage';
@@ -17,7 +19,7 @@ import { DEFAULT_SETTINGS, loadSettings, saveSettings } from './utils/settings';
 import { roundSeconds } from './utils/rounding';
 import { requestNotificationPermission, notifyTaskReminder } from './utils/notifications';
 import { auth } from './utils/firebase';
-import { loadUserData, saveUserData, saveSharedProject, loadSharedProjectsForUser, onSharedProjectTasksChange, onUserTasksChange, saveSharedProjectTasks } from './utils/firestore';
+import { loadUserData, saveUserData, saveSharedProject, loadSharedProjectsForUser, onSharedProjectTasksChange, onUserTasksChange, saveSharedProjectTasks, joinProjectViaInvite } from './utils/firestore';
 import { onAuthStateChanged, sendEmailVerification } from 'firebase/auth';
 import './App.css';
 
@@ -996,8 +998,13 @@ function AppContent() {
     }
   };
 
+  const handleUpdateKanbanStages = (newStages) => {
+    const proj = projects.find((p) => p.id === activeProjectId);
+    if (!proj) return;
+    handleUpdateProject({ ...proj, kanbanStages: newStages });
+  };
+
   const handleDeleteProjectFromSettings = (projectId) => {
-    // Don't allow deleting the default project
     if (projectId === 'default') return;
 
     // Delete all tasks from this project
@@ -1783,7 +1790,25 @@ function AppContent() {
         </form>
 
         <div className="tasks-list">
-          {displayMode === 'KANBAN' ? (
+          {displayMode === 'KANBAN_STAGES' ? (
+            // KANBAN STAGES MODE: Display tasks in custom workflow stage columns
+            <KanbanStagesBoard
+              tasks={filteredTasks}
+              runningTaskId={runningTaskId}
+              onStart={startTask}
+              onPause={pauseTask}
+              onComplete={completeTask}
+              onToggleUrgent={toggleUrgent}
+              onReopen={reopenTask}
+              onDelete={deleteTask}
+              onUpdateTask={updateTask}
+              onEditTime={editTaskTime}
+              currentProject={activeProject}
+              isDefaultProject={activeProjectId === 'default'}
+              currentUserEmail={user?.email || 'Anonymous'}
+              onUpdateStages={handleUpdateKanbanStages}
+            />
+          ) : displayMode === 'KANBAN' ? (
             // KANBAN MODE: Display tasks in columns by assignee
             activeProject && activeProject.members && activeProject.members.length > 0 ? (
               <KanbanBoard
@@ -1929,10 +1954,21 @@ function AppContent() {
 }
 
 function App() {
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+
   return (
     <Routes>
       <Route path="/" element={<AppContent />} />
       <Route path="/projetos/:projectId" element={<AppContent />} />
+      <Route
+        path="/convite/:projectId/:inviteToken"
+        element={
+          <>
+            <JoinProjectPage onOpenAuth={() => setIsAuthModalOpen(true)} />
+            <AuthModal isOpen={isAuthModalOpen} onClose={() => setIsAuthModalOpen(false)} />
+          </>
+        }
+      />
     </Routes>
   );
 }

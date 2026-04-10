@@ -1,0 +1,318 @@
+.kanban-stages-board {
+  display: flex;
+  gap: 1.25rem;
+  overflow-x: auto;
+  padding: 0.5rem 0 1.5rem;
+  min-height: 400px;
+  align-items: flex-start;
+}
+
+.kanban-stages-board::-webkit-scrollbar {
+  height: 8px;
+}
+
+.kanban-stages-board::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.kanban-stages-board::-webkit-scrollbar-thumb {
+  background: #2a2a2a;
+  border-radius: 4px;
+}
+
+.kanban-stages-board::-webkit-scrollbar-thumb:hover {
+  background: #3a3a3a;
+}
+
+/* ─── Column ─────────────────────────────────────────────── */
+
+.kanban-stages-column {
+  flex: 0 0 300px;
+  min-width: 300px;
+  max-width: 300px;
+  background: #0f0f0f;
+  border: 1px solid #2a2a2a;
+  border-radius: 10px;
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  transition: background 0.2s, border-color 0.2s;
+}
+
+.kanban-stages-column.drag-over {
+  background: rgba(74, 222, 185, 0.07);
+  border: 2px dashed var(--projectColor, #4adeb9);
+}
+
+/* ─── Column Header ──────────────────────────────────────── */
+
+.kanban-stages-column-header {
+  margin-bottom: 0.85rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 2px solid #222;
+}
+
+.stage-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.kanban-stages-column-title {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #e5e5e5;
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+  cursor: default;
+  user-select: none;
+}
+
+.kanban-stages-column-title:hover {
+  color: var(--projectColor, #4adeb9);
+}
+
+.stage-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
+
+.kanban-column-stats {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.82rem;
+}
+
+.stat-active {
+  color: #888;
+  font-weight: 500;
+}
+
+.stat-separator {
+  color: #444;
+}
+
+.stat-completed {
+  color: var(--projectColor, #4adeb9);
+  font-weight: 500;
+}
+
+.btn-delete-stage {
+  background: none;
+  border: none;
+  color: #555;
+  cursor: pointer;
+  font-size: 0.75rem;
+  padding: 2px 4px;
+  border-radius: 4px;
+  line-height: 1;
+  transition: color 0.15s, background 0.15s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.btn-delete-stage:hover {
+  color: #ff6b6b;
+  background: rgba(255, 107, 107, 0.1);
+}
+
+.stage-delete-confirm {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-top: 0.6rem;
+  padding: 0.55rem 0.65rem;
+  background: rgba(255, 107, 107, 0.08);
+  border: 1px solid rgba(255, 107, 107, 0.3);
+  border-radius: 7px;
+}
+
+.stage-delete-confirm-text {
+  flex: 1 1 100%;
+  font-size: 0.8rem;
+  color: #ff9a9a;
+  line-height: 1.3;
+}
+
+.btn-stage-confirm-delete {
+  background: #c0392b;
+  color: #fff;
+  border: none;
+  border-radius: 5px;
+  padding: 0.28rem 0.7rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.btn-stage-confirm-delete:hover {
+  background: #e74c3c;
+}
+
+/* ─── Inline Stage Editing ───────────────────────────────── */
+
+.stage-edit-row {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.stage-name-input {
+  flex: 1;
+  background: #1a1a1a;
+  border: 1px solid var(--projectColor, #4adeb9);
+  border-radius: 6px;
+  color: #e5e5e5;
+  font-size: 0.9rem;
+  padding: 0.3rem 0.5rem;
+  outline: none;
+  min-width: 0;
+}
+
+.btn-stage-confirm {
+  background: var(--projectColor, #4adeb9);
+  color: #0a0a0a;
+  border: none;
+  border-radius: 5px;
+  padding: 0.3rem 0.55rem;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: opacity 0.15s;
+}
+
+.btn-stage-confirm:hover {
+  opacity: 0.85;
+}
+
+.btn-stage-cancel {
+  background: #2a2a2a;
+  color: #a0a0a0;
+  border: none;
+  border-radius: 5px;
+  padding: 0.3rem 0.55rem;
+  font-size: 0.82rem;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s;
+}
+
+.btn-stage-cancel:hover {
+  background: #333;
+}
+
+/* ─── Column Tasks ───────────────────────────────────────── */
+
+.kanban-stages-column-tasks {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  overflow-y: auto;
+  max-height: calc(100vh - 280px);
+}
+
+.kanban-stages-column-tasks::-webkit-scrollbar {
+  width: 4px;
+}
+
+.kanban-stages-column-tasks::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.kanban-stages-column-tasks::-webkit-scrollbar-thumb {
+  background: #2a2a2a;
+  border-radius: 3px;
+}
+
+.kanban-stages-empty-state {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem 1rem;
+  text-align: center;
+  color: #444;
+  font-size: 0.85rem;
+  border: 1px dashed #222;
+  border-radius: 8px;
+  margin-top: 0.5rem;
+}
+
+/* ─── Dragging ───────────────────────────────────────────── */
+
+.kanban-task-wrapper {
+  cursor: grab;
+  border-radius: 6px;
+  transition: opacity 0.15s, transform 0.15s;
+}
+
+.kanban-task-wrapper:active {
+  cursor: grabbing;
+}
+
+.kanban-task-wrapper.dragging {
+  opacity: 0.4;
+  transform: scale(0.97);
+}
+
+/* ─── Add Stage Column ───────────────────────────────────── */
+
+.kanban-stages-add-column {
+  flex: 0 0 220px;
+  min-width: 220px;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-start;
+  padding-top: 0.25rem;
+}
+
+.btn-add-stage {
+  background: transparent;
+  border: 2px dashed #2a2a2a;
+  border-radius: 10px;
+  color: #666;
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  padding: 0.75rem 1rem;
+  width: 100%;
+  text-align: center;
+  transition: border-color 0.2s, color 0.2s;
+}
+
+.btn-add-stage:hover {
+  border-color: var(--projectColor, #4adeb9);
+  color: var(--projectColor, #4adeb9);
+}
+
+.add-stage-form {
+  background: #0f0f0f;
+  border: 1px solid #2a2a2a;
+  border-radius: 10px;
+  padding: 0.9rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.add-stage-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.add-stage-actions .btn-stage-confirm,
+.add-stage-actions .btn-stage-cancel {
+  flex: 1;
+}

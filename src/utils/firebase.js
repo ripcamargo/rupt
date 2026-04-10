@@ -1,5 +1,5 @@
 import { initializeApp } from 'firebase/app';
-import { getAuth } from 'firebase/auth';
+import { getAuth, GoogleAuthProvider } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
 
 const firebaseConfig = {
@@ -36,4 +36,4 @@ try {
   console.error('[Firebase Init Error]', error);
 }
 
-export { auth, db, firebaseInitError };
+export { auth, db, firebaseInitError, GoogleAuthProvider };

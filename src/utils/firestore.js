@@ -178,8 +178,7 @@ export const onUserTasksChange = (uid, callback) => {
 };
 
 // Save tasks to shared project
-export const saveSharedProjectTasks = async (projectId, tasks) => {
-  try {
+export const saveSharedProjectTasks = async (projectId, tasks) => {  try {
     const projectRef = doc(db, 'sharedProjects', projectId);
     console.log(`Saving ${tasks.length} tasks to shared project ${projectId}`);
     await setDoc(projectRef, {
@@ -191,4 +190,38 @@ export const saveSharedProjectTasks = async (projectId, tasks) => {
     console.error('Failed to save shared project tasks:', error);
     throw error;
   }
+};
+
+// Join a project via an invite link
+export const joinProjectViaInvite = async (projectId, token, userEmail, userName) => {
+  const project = await loadSharedProject(projectId);
+  if (!project) throw new Error('Projeto não encontrado. O link pode ser inválido.');
+  if (!project.inviteToken || project.inviteToken !== token) {
+    throw new Error('Link de convite inválido ou já foi revogado.');
+  }
+
+  const normalizedEmail = (userEmail || '').trim().toLowerCase();
+
+  // Already a member: just return the project data
+  if (project.memberEmails && project.memberEmails.includes(normalizedEmail)) {
+    return project;
+  }
+
+  const newMember = {
+    email: normalizedEmail,
+    name: userName || normalizedEmail.split('@')[0],
+    joinedAt: new Date().toISOString(),
+  };
+
+  const updatedMembers = [...(project.members || []), newMember];
+  const updatedMemberEmails = [...(project.memberEmails || []), normalizedEmail];
+
+  const projectRef = doc(db, 'sharedProjects', projectId);
+  await setDoc(
+    projectRef,
+    { members: updatedMembers, memberEmails: updatedMemberEmails, updatedAt: serverTimestamp() },
+    { merge: true }
+  );
+
+  return { ...project, members: updatedMembers, memberEmails: updatedMemberEmails };
 };

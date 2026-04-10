@@ -1,0 +1,171 @@
+.join-page {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #0a0a0a;
+  padding: 1.5rem;
+}
+
+.join-card {
+  width: min(440px, 100%);
+  background: #111;
+  border: 1px solid #2a2a2a;
+  border-radius: 14px;
+  padding: 2rem 2rem 1.75rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.85rem;
+  text-align: center;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
+}
+
+/* ─── Project color strip ───────────────────────────────── */
+
+.join-project-color {
+  width: 48px;
+  height: 8px;
+  border-radius: 99px;
+  margin-bottom: 0.25rem;
+}
+
+/* ─── Text ──────────────────────────────────────────────── */
+
+.join-card h2 {
+  margin: 0;
+  font-size: 1.5rem;
+  color: #f0f0f0;
+  font-weight: 700;
+}
+
+.join-project-name {
+  font-size: 1.45rem;
+}
+
+.join-project-desc {
+  color: #888;
+  font-size: 0.9rem;
+  margin: 0;
+  line-height: 1.4;
+}
+
+.join-subtitle {
+  color: #aaa;
+  font-size: 0.9rem;
+  margin: 0;
+  line-height: 1.5;
+}
+
+.join-subtitle strong {
+  color: #e0e0e0;
+}
+
+.join-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  font-size: 0.82rem;
+  color: #666;
+  background: #181818;
+  border: 1px solid #222;
+  border-radius: 8px;
+  padding: 0.7rem 1rem;
+  width: 100%;
+}
+
+.join-meta strong {
+  color: #aaa;
+}
+
+/* ─── Loading ───────────────────────────────────────────── */
+
+.join-spinner {
+  width: 36px;
+  height: 36px;
+  border: 3px solid #2a2a2a;
+  border-top-color: #4adeb9;
+  border-radius: 50%;
+  animation: join-spin 0.8s linear infinite;
+  margin-bottom: 0.5rem;
+}
+
+@keyframes join-spin {
+  to { transform: rotate(360deg); }
+}
+
+.join-loading-text {
+  color: #666;
+  font-size: 0.9rem;
+  margin: 0;
+}
+
+/* ─── Icons ─────────────────────────────────────────────── */
+
+.join-icon {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.5rem;
+  font-weight: 700;
+  margin-bottom: 0.25rem;
+}
+
+.join-icon--ok {
+  background: rgba(74, 222, 185, 0.12);
+  color: #4adeb9;
+  border: 2px solid rgba(74, 222, 185, 0.35);
+}
+
+.join-icon--error {
+  background: rgba(255, 107, 107, 0.1);
+  color: #ff6b6b;
+  border: 2px solid rgba(255, 107, 107, 0.3);
+}
+
+/* ─── Buttons ───────────────────────────────────────────── */
+
+.btn-join-primary {
+  width: 100%;
+  padding: 0.85rem;
+  background: #4adeb9;
+  color: #04110c;
+  border: none;
+  border-radius: 8px;
+  font-size: 0.95rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.2s, transform 0.15s;
+  margin-top: 0.4rem;
+}
+
+.btn-join-primary:hover {
+  background: #5be896;
+  transform: translateY(-1px);
+}
+
+.btn-join-primary:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.btn-join-cancel,
+.btn-join-home {
+  color: #666;
+  font-size: 0.85rem;
+  text-decoration: none;
+  border: none;
+  background: none;
+  cursor: pointer;
+  transition: color 0.15s;
+  margin-top: 0.1rem;
+}
+
+.btn-join-cancel:hover,
+.btn-join-home:hover {
+  color: #aaa;
+}

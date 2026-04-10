@@ -2,6 +2,11 @@ import { useState, useEffect } from 'react';
 import { CloseIcon, SettingsIcon } from './Icons';
 import '../styles/ProjectSettingsModal.css';
 
+const generateToken = () =>
+  typeof crypto !== 'undefined' && crypto.randomUUID
+    ? crypto.randomUUID()
+    : Math.random().toString(36).substring(2) + Date.now().toString(36);
+
 function ProjectSettingsModal({ isOpen, onClose, project, currentUserId, user, onOpenAuth, onUpdate, onDelete, onLeaveProject }) {
   const [formData, setFormData] = useState({
     name: '',
@@ -14,6 +19,7 @@ function ProjectSettingsModal({ isOpen, onClose, project, currentUserId, user, o
   const [newMemberEmail, setNewMemberEmail] = useState('');
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
+  const [copySuccess, setCopySuccess] = useState(false);
 
   useEffect(() => {
     if (project && isOpen) {
@@ -26,6 +32,9 @@ function ProjectSettingsModal({ isOpen, onClose, project, currentUserId, user, o
       });
       setMembers(project.members || []);
       setNewMemberEmail('');
+      setShowDeleteConfirm(false);
+      setShowLeaveConfirm(false);
+      setCopySuccess(false);
     }
   }, [project, isOpen]);
 
@@ -82,6 +91,7 @@ function ProjectSettingsModal({ isOpen, onClose, project, currentUserId, user, o
       ...project,
       ...formData,
       members,
+      inviteToken: project.inviteToken || null,
     });
     onClose();
   };
@@ -168,6 +178,7 @@ function ProjectSettingsModal({ isOpen, onClose, project, currentUserId, user, o
                       <option value="LIST">Lista</option>
                       <option value="BLOCKS">Blocos</option>
                       <option value="KANBAN">Kanban (por responsável)</option>
+                      <option value="KANBAN_STAGES">Kanban (por etapas)</option>
                     </select>
                   </div>
 
@@ -270,6 +281,54 @@ function ProjectSettingsModal({ isOpen, onClose, project, currentUserId, user, o
                 </div>
               )}
 
+              {/* Invite Link */}
+              {!isDefaultProject && isAdmin && user && (
+                <div className="form-section">
+                  <h3>Link de Convite</h3>
+                  <p className="invite-description">
+                    Compartilhe este link para convidar pessoas ao projeto. Qualquer pessoa com o link poderá solicitar entrada.
+                  </p>
+
+                  {project.inviteToken ? (
+                    <>
+                      <div className="invite-link-box">
+                        <span className="invite-link-text">
+                          {`${window.location.origin}/convite/${project.id}/${project.inviteToken}`}
+                        </span>
+                        <button
+                          type="button"
+                          className="btn-copy-link"
+                          onClick={() => {
+                            navigator.clipboard.writeText(
+                              `${window.location.origin}/convite/${project.id}/${project.inviteToken}`
+                            );
+                            setCopySuccess(true);
+                            setTimeout(() => setCopySuccess(false), 2000);
+                          }}
+                        >
+                          {copySuccess ? '✓ Copiado' : 'Copiar'}
+                        </button>
+                      </div>
+                      <button
+                        type="button"
+                        className="btn-revoke-link"
+                        onClick={() => onUpdate({ ...project, inviteToken: null })}
+                      >
+                        Revogar link
+                      </button>
+                    </>
+                  ) : (
+                    <button
+                      type="button"
+                      className="btn-generate-link"
+                      onClick={() => onUpdate({ ...project, inviteToken: generateToken() })}
+                    >
+                      Gerar link de convite
+                    </button>
+                  )}
+                </div>
+              )}
+
               {/* Action Buttons */}
               <div className="form-section form-actions">
                 <button type="submit" className="btn-save-settings">
@@ -305,7 +364,7 @@ function ProjectSettingsModal({ isOpen, onClose, project, currentUserId, user, o
 
                 <div className="viewer-field">
                   <label>Modo de Exibição</label>
-                  <p>{project.displayMode === 'LIST' ? 'Lista' : 'Blocos'}</p>
+                  <p>{project.displayMode === 'LIST' ? 'Lista' : project.displayMode === 'BLOCKS' ? 'Blocos' : project.displayMode === 'KANBAN' ? 'Kanban (por responsável)' : project.displayMode === 'KANBAN_STAGES' ? 'Kanban (por etapas)' : project.displayMode}</p>
                 </div>
 
                 <div className="viewer-field">
