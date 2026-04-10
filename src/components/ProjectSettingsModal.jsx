@@ -20,6 +20,7 @@ function ProjectSettingsModal({ isOpen, onClose, project, currentUserId, user, o
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
   const [copySuccess, setCopySuccess] = useState(false);
+  const [localInviteToken, setLocalInviteToken] = useState(null);
 
   useEffect(() => {
     if (project && isOpen) {
@@ -35,6 +36,7 @@ function ProjectSettingsModal({ isOpen, onClose, project, currentUserId, user, o
       setShowDeleteConfirm(false);
       setShowLeaveConfirm(false);
       setCopySuccess(false);
+      setLocalInviteToken(project.inviteToken || null);
 
       // If the project has an invite token, force a sync to Firestore
       // so the token is available even if it was created before the sync fix.
@@ -295,18 +297,18 @@ function ProjectSettingsModal({ isOpen, onClose, project, currentUserId, user, o
                     Compartilhe este link para convidar pessoas ao projeto. Qualquer pessoa com o link poderá solicitar entrada.
                   </p>
 
-                  {project.inviteToken ? (
+                  {localInviteToken ? (
                     <>
                       <div className="invite-link-box">
                         <span className="invite-link-text">
-                          {`${window.location.origin}/convite/${project.id}/${project.inviteToken}`}
+                          {`${window.location.origin}/convite/${project.id}/${localInviteToken}`}
                         </span>
                         <button
                           type="button"
                           className="btn-copy-link"
                           onClick={() => {
                             navigator.clipboard.writeText(
-                              `${window.location.origin}/convite/${project.id}/${project.inviteToken}`
+                              `${window.location.origin}/convite/${project.id}/${localInviteToken}`
                             );
                             setCopySuccess(true);
                             setTimeout(() => setCopySuccess(false), 2000);
@@ -318,7 +320,10 @@ function ProjectSettingsModal({ isOpen, onClose, project, currentUserId, user, o
                       <button
                         type="button"
                         className="btn-revoke-link"
-                        onClick={() => onUpdate({ ...project, inviteToken: null })}
+                        onClick={() => {
+                          setLocalInviteToken(null);
+                          onUpdate({ ...project, inviteToken: null });
+                        }}
                       >
                         Revogar link
                       </button>
@@ -327,7 +332,11 @@ function ProjectSettingsModal({ isOpen, onClose, project, currentUserId, user, o
                     <button
                       type="button"
                       className="btn-generate-link"
-                      onClick={() => onUpdate({ ...project, inviteToken: generateToken() })}
+                      onClick={() => {
+                        const token = generateToken();
+                        setLocalInviteToken(token);
+                        onUpdate({ ...project, inviteToken: token });
+                      }}
                     >
                       Gerar link de convite
                     </button>
