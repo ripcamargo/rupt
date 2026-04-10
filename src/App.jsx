@@ -230,7 +230,10 @@ function AppContent() {
       console.log('Checking project:', projectId, 'exists:', projectExists, 'in projects:', projects.map(p => p.id));
       
       if (!projectExists) {
-        // Project doesn't exist, redirect to default (root)
+        // Wait for Firebase to finish loading before redirecting.
+        // Projects loaded from localStorage may not include shared projects yet.
+        if (authLoading) return;
+        // Firebase loaded and project still not found — redirect to default
         console.log('Project not found, redirecting to home');
         navigate('/', { replace: true });
         return;
@@ -241,7 +244,7 @@ function AppContent() {
       setActiveProjectId(projectId);
       localStorage.setItem('rupt_active_project', projectId);
     }
-  }, [projectId, projects, navigate, location]);
+  }, [projectId, projects, navigate, location, authLoading]);
 
   // Handle Firebase auth state
   useEffect(() => {
@@ -292,36 +295,45 @@ function AppContent() {
         const sharedProjects = await loadSharedProjectsForUser(currentUser.email);
 
         if (remoteData) {
+          // Firebase is authoritative. Merge only to preserve local-only tasks not yet synced.
           const mergedTasks = mergeTasks(localTasks, remoteData.tasks || []);
           const migratedTasks = migrateTasksWithAssignee(mergedTasks, currentUser.email);
-          // Deduplicate in case there are existing duplicates from previous bug
           const cleanedTasks = deduplicateTasks(migratedTasks);
           const mergedSettings = mergeSettings(localSettings, remoteData.settings);
-          
-          // Start with local projects as base (includes "Minhas Tarefas")
-          let allProjects = [...claimedLocalProjects];
-          
-          // Merge with remote projects owned by this user
-          if (remoteData.projects && remoteData.projects.length > 0) {
-            remoteData.projects.forEach(remoteProject => {
-              const existingIndex = allProjects.findIndex(p => p.id === remoteProject.id);
-              if (existingIndex >= 0) {
-                // Update existing project
-                allProjects[existingIndex] = remoteProject;
-              } else if (remoteProject.id !== 'default') {
-                // Add new project (not default)
-                allProjects.push(remoteProject);
-              }
+
+          // Firebase projects are the source of truth.
+          // Add any truly local-only projects (created offline, not yet in Firebase).
+          let allProjects = remoteData.projects && remoteData.projects.length > 0
+            ? [...remoteData.projects]
+            : [...claimedLocalProjects];
+
+          // Ensure default project always exists
+          if (!allProjects.some(p => p.id === 'default')) {
+            allProjects.unshift({
+              id: 'default', name: 'Minhas Tarefas', description: '',
+              displayMode: 'LIST', color: '#4adeb9', groupByDay: true,
+              members: [], adminId: currentUser.uid, adminEmail: currentUser.email || 'Anonymous',
             });
           }
-          
-          // Add shared projects that aren't already in the list
+
+          // Add local-only projects not yet in Firebase (created offline)
+          claimedLocalProjects.forEach(localProject => {
+            if (localProject.id !== 'default' && !allProjects.some(p => p.id === localProject.id)) {
+              allProjects.push(localProject);
+            }
+          });
+
+          // Add shared projects (joined via invite) not yet in the list
           sharedProjects.forEach(sharedProject => {
-            if (!allProjects.some(p => p.id === sharedProject.id)) {
+            const existingIdx = allProjects.findIndex(p => p.id === sharedProject.id);
+            if (existingIdx >= 0) {
+              // Replace with latest data from sharedProjects collection
+              allProjects[existingIdx] = sharedProject;
+            } else {
               allProjects.push(sharedProject);
             }
           });
-          
+
           // Check for new shared projects and show notification
           checkForNewSharedProjects(allProjects);
           
@@ -697,7 +709,7 @@ function AppContent() {
     } else {
       // Setup listener for personal user tasks
       console.log('Setting up listener for user personal tasks');
-      unsubscribeUserTasksRef.current = onUserTasksChange(user.uid, (personalTasks) => {
+      unsubscribeUserTasksRef.current = onUserTasksChange(user.uid, ({ tasks: personalTasks, projects: firestoreProjects }) => {
         // Prevent loop: only update if not currently receiving from listener or hydrating
         if (isReceivingFromListenerRef.current || isHydratingRef.current) {
           console.log('Skipping personal tasks update - receiving or hydrating');
@@ -705,6 +717,22 @@ function AppContent() {
         }
         
         isReceivingFromListenerRef.current = true;
+
+        // Update projects from Firebase if available (picks up changes from other devices)
+        if (firestoreProjects && firestoreProjects.length > 0) {
+          setProjects((prevProjects) => {
+            // Keep shared projects (not owned by user) + default, merge with Firebase data
+            const sharedOnlyProjects = prevProjects.filter(
+              (p) => p.id !== 'default' && p.adminId !== user.uid
+            );
+            const merged = [
+              ...firestoreProjects,
+              ...sharedOnlyProjects.filter((sp) => !firestoreProjects.some((fp) => fp.id === sp.id)),
+            ];
+            localStorage.setItem('rupt_projects', JSON.stringify(merged));
+            return merged;
+          });
+        }
         
         // Deduplicate incoming tasks (safety check)
         const uniquePersonalTasks = deduplicateTasks(personalTasks);

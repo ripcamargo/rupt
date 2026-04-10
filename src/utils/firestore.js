@@ -163,8 +163,11 @@ export const onUserTasksChange = (uid, callback) => {
     const unsubscribe = onSnapshot(userRef, (snapshot) => {
       if (snapshot.exists()) {
         const data = snapshot.data();
-        console.log('User tasks updated:', data.tasks);
-        callback(data.tasks || []);
+        callback({
+          tasks: Array.isArray(data.tasks) ? data.tasks : [],
+          projects: Array.isArray(data.projects) ? data.projects : null,
+          settings: data.settings || null,
+        });
       }
     }, (error) => {
       console.error('Error listening to user tasks:', error);
