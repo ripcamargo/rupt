@@ -20,7 +20,7 @@ import { roundSeconds } from './utils/rounding';
 import { requestNotificationPermission, notifyTaskReminder } from './utils/notifications';
 import { auth } from './utils/firebase';
 import { openPip, CHANNEL_NAME } from './utils/pip';
-import { loadUserData, saveUserData, saveSharedProject, loadSharedProjectsForUser, onSharedProjectTasksChange, onUserTasksChange, saveSharedProjectTasks, joinProjectViaInvite } from './utils/firestore';
+import { loadUserData, saveUserData, saveSharedProject, loadSharedProject, loadSharedProjectsForUser, onSharedProjectTasksChange, onUserTasksChange, saveSharedProjectTasks, joinProjectViaInvite } from './utils/firestore';
 import { onAuthStateChanged, sendEmailVerification } from 'firebase/auth';
 import './App.css';
 
@@ -1020,14 +1020,47 @@ function AppContent() {
     }
   };
 
-  const handleOpenProjectSettings = (projectId) => {
-    const project = projects.find(p => p.id === projectId);
-    setSelectedProjectForSettings(project);
+  const handleOpenProjectSettings = async (projectId) => {
+    const localProject = projects.find(p => p.id === projectId);
     setIsProjectSettingsOpen(true);
+    setSelectedProjectForSettings(localProject); // show immediately with local data
+
+    // For shared/invite projects, fetch fresh member list from Firestore
+    const isShared = localProject && (localProject.members?.length > 0 || localProject.inviteEnabled);
+    if (isShared && localProject.id !== 'default') {
+      const freshData = await loadSharedProject(projectId);
+      if (freshData) {
+        const merged = { ...localProject, members: freshData.members || [], memberEmails: freshData.memberEmails || [] };
+        setProjects(prev =>
+          prev.map(p => p.id === projectId ? merged : p)
+        );
+        localStorage.setItem('rupt_projects', JSON.stringify(
+          projects.map(p => p.id === projectId ? merged : p)
+        ));
+      }
+    }
   };
 
   const handleUpdateProject = async (updatedProject) => {
     console.log('Updating project:', updatedProject);
+
+    // For shared/invite projects, fetch current Firestore members first to avoid
+    // overwriting members that joined after our last local sync.
+    const isShared = (updatedProject.members && updatedProject.members.length > 0) || updatedProject.inviteEnabled === true;
+    if (isShared && updatedProject.id !== 'default') {
+      const currentFirestore = await loadSharedProject(updatedProject.id);
+      if (currentFirestore) {
+        // Merge: take anyone who is in Firestore but not in local state (recently joined)
+        const localEmailSet = new Set((updatedProject.members || []).map(m => m.email?.toLowerCase()));
+        const extraMembers = (currentFirestore.members || []).filter(m => !localEmailSet.has(m.email?.toLowerCase()));
+        if (extraMembers.length > 0) {
+          updatedProject = {
+            ...updatedProject,
+            members: [...(updatedProject.members || []), ...extraMembers],
+          };
+        }
+      }
+    }
     const updatedProjects = projects.map(p => 
       p.id === updatedProject.id ? updatedProject : p
     );
