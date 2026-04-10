@@ -139,7 +139,17 @@ export const onSharedProjectTasksChange = (projectId, callback) => {
       if (snapshot.exists()) {
         const data = snapshot.data();
         console.log('Shared project tasks updated from listener:', projectId, 'tasks count:', data.tasks?.length || 0);
-        callback({ tasks: data.tasks || [], members: data.members || [], memberEmails: data.memberEmails || [] });
+        callback({
+          tasks: data.tasks || [],
+          members: data.members || [],
+          memberEmails: data.memberEmails || [],
+          displayMode: data.displayMode,
+          groupByDay: data.groupByDay,
+          color: data.color,
+          name: data.name,
+          description: data.description,
+          kanbanStages: data.kanbanStages,
+        });
       } else {
         console.log('Shared project document does not exist:', projectId);
         callback({ tasks: [], members: [], memberEmails: [] });

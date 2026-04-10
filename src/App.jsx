@@ -667,7 +667,17 @@ function AppContent() {
     if (isSharedProject && activeProjectId !== 'default') {
       // Setup listener for shared project tasks
       console.log('Setting up listener for shared project:', activeProjectId);
-      unsubscribeSharedProjectRef.current = onSharedProjectTasksChange(activeProjectId, ({ tasks: sharedProjectTasks, members: sharedMembers, memberEmails: sharedMemberEmails }) => {
+      unsubscribeSharedProjectRef.current = onSharedProjectTasksChange(activeProjectId, ({
+        tasks: sharedProjectTasks,
+        members: sharedMembers,
+        memberEmails: sharedMemberEmails,
+        displayMode,
+        groupByDay,
+        color,
+        name,
+        description,
+        kanbanStages,
+      }) => {
         // Prevent loop: only update if not currently receiving from listener
         if (isReceivingFromListenerRef.current) {
           console.log('Skipping update - already receiving from listener');
@@ -676,14 +686,23 @@ function AppContent() {
         
         isReceivingFromListenerRef.current = true;
         
-        // Update members if changed
+        // Update project metadata + members if changed
         setProjects((prevProjects) => {
           const updated = prevProjects.map((p) =>
             p.id === activeProjectId
-              ? { ...p, members: sharedMembers, memberEmails: sharedMemberEmails }
+              ? {
+                  ...p,
+                  members: sharedMembers,
+                  memberEmails: sharedMemberEmails,
+                  ...(displayMode !== undefined && { displayMode }),
+                  ...(groupByDay !== undefined && { groupByDay }),
+                  ...(color !== undefined && { color }),
+                  ...(name !== undefined && { name }),
+                  ...(description !== undefined && { description }),
+                  ...(kanbanStages !== undefined && { kanbanStages }),
+                }
               : p
           );
-          // Persist updated member list to localStorage so admin sees it on reload
           localStorage.setItem('rupt_projects', JSON.stringify(updated));
           return updated;
         });
