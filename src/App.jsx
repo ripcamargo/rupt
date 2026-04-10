@@ -73,8 +73,11 @@ function AppContent() {
   const timerBaseDurationRef = useRef(0); // Track base duration when timer starts
   const isHydratingRef = useRef(false);
   const unsubscribeUserTasksRef = useRef(null); // Real-time listener for user's personal tasks
-  const unsubscribeSharedProjectRef = useRef(null); // Real-time listener for shared project tasks
-  const isReceivingFromListenerRef = useRef(false); // Prevent sync loop when receiving from listener
+  const sharedListenersRef = useRef({}); // Map of projectId -> unsubscribe fn for each shared project listener
+  const tasksSyncPendingRef = useRef(false); // Signals deferred Firestore sync after batched task state updates
+  // Stable callback refs so long-lived Firestore listeners always invoke the latest closure
+  const handleSharedProjectUpdateRef = useRef(null);
+  const handleUserTasksUpdateRef = useRef(null);
   const isExtensionLoginModeRef = useRef(false); // Track if we're in extension login mode (survives URL changes)
   const authGateSeenKey = 'rupt_seen_auth_gate';
   const seenSharedProjectsKey = 'rupt_seen_shared_projects'; // Track which shared projects user has seen notification for
@@ -591,27 +594,34 @@ function AppContent() {
     if (!user || authLoading) return;
 
     const refreshSharedProjects = async () => {
-      const sharedProjects = await loadSharedProjectsForUser(user.email);
+      try {
+        const sharedProjects = await loadSharedProjectsForUser(user.email);
+        // Safety guard: if the query returns nothing (network blip, eventual consistency delay,
+        // or user has no shared projects), do NOT wipe existing shared projects from state.
+        if (sharedProjects.length === 0) return;
 
-      setProjects((prevProjects) => {
-        // Keep default + owned projects, replace invited shared projects with fresh query data
-        const baseProjects = prevProjects.filter(
-          (project) => project.id === 'default' || project.adminId === user.uid
-        );
+        setProjects((prevProjects) => {
+          // Keep default + owned projects, replace invited shared projects with fresh query data
+          const baseProjects = prevProjects.filter(
+            (project) => project.id === 'default' || project.adminId === user.uid
+          );
 
-        const mergedProjects = [...baseProjects];
-        sharedProjects.forEach((sharedProject) => {
-          const existingIndex = mergedProjects.findIndex((project) => project.id === sharedProject.id);
-          if (existingIndex >= 0) {
-            mergedProjects[existingIndex] = sharedProject;
-          } else {
-            mergedProjects.push(sharedProject);
-          }
+          const mergedProjects = [...baseProjects];
+          sharedProjects.forEach((sharedProject) => {
+            const existingIndex = mergedProjects.findIndex((project) => project.id === sharedProject.id);
+            if (existingIndex >= 0) {
+              mergedProjects[existingIndex] = sharedProject;
+            } else {
+              mergedProjects.push(sharedProject);
+            }
+          });
+
+          localStorage.setItem('rupt_projects', JSON.stringify(mergedProjects));
+          return mergedProjects;
         });
-
-        localStorage.setItem('rupt_projects', JSON.stringify(mergedProjects));
-        return mergedProjects;
-      });
+      } catch (err) {
+        console.error('Error refreshing shared projects:', err);
+      }
     };
 
     const handleFocus = () => {
@@ -646,152 +656,139 @@ function AppContent() {
     }
   }, [authLoading, user]);
 
-  // Setup real-time listeners for shared and personal projects
+  // ── Stable callback refs ──────────────────────────────────────────────────
+  // Assigned on every render so long-lived Firestore listeners always call the
+  // latest closure without needing to be torn down and recreated.
+
+  handleSharedProjectUpdateRef.current = (projectId, {
+    tasks: sharedTasks = [],
+    members = [],
+    memberEmails = [],
+    displayMode,
+    groupByDay,
+    color,
+    name,
+    description,
+    kanbanStages,
+  }) => {
+    setProjects((prevProjects) => {
+      const updated = prevProjects.map((p) =>
+        p.id === projectId
+          ? {
+              ...p,
+              members,
+              memberEmails,
+              ...(displayMode !== undefined && { displayMode }),
+              ...(groupByDay !== undefined && { groupByDay }),
+              ...(color !== undefined && { color }),
+              ...(name !== undefined && { name }),
+              ...(description !== undefined && { description }),
+              ...(kanbanStages !== undefined && { kanbanStages }),
+            }
+          : p
+      );
+      localStorage.setItem('rupt_projects', JSON.stringify(updated));
+      return updated;
+    });
+    const uniqueSharedTasks = deduplicateTasks(sharedTasks);
+    setTasks((prevTasks) => {
+      const otherTasks = prevTasks.filter((t) => t.projectId !== projectId);
+      return deduplicateTasks([...uniqueSharedTasks, ...otherTasks]);
+    });
+  };
+
+  handleUserTasksUpdateRef.current = ({ tasks: personalTasks, projects: firestoreProjects }) => {
+    if (isHydratingRef.current) return;
+    if (firestoreProjects && firestoreProjects.length > 0) {
+      setProjects((prevProjects) => {
+        const sharedOnlyProjects = prevProjects.filter(
+          (p) => p.id !== 'default' && p.adminId !== user?.uid
+        );
+        const merged = [
+          ...firestoreProjects,
+          ...sharedOnlyProjects.filter((sp) => !firestoreProjects.some((fp) => fp.id === sp.id)),
+        ];
+        localStorage.setItem('rupt_projects', JSON.stringify(merged));
+        return merged;
+      });
+    }
+    const uniquePersonalTasks = deduplicateTasks(personalTasks);
+    setTasks((prevTasks) => {
+      const sharedProjectTasks = prevTasks.filter((t) => {
+        const proj = projectsRef.current.find((p) => p.id === t.projectId);
+        return proj && (proj.members?.length > 0 || proj.inviteEnabled === true);
+      });
+      return deduplicateTasks([...uniquePersonalTasks, ...sharedProjectTasks]);
+    });
+  };
+
+  // ── Personal user listener (one per login session) ────────────────────────
+  useEffect(() => {
+    if (!user || authLoading || isHydratingRef.current) return;
+    const unsub = onUserTasksChange(user.uid, (data) => handleUserTasksUpdateRef.current(data));
+    unsubscribeUserTasksRef.current = unsub;
+    return () => {
+      unsub();
+      unsubscribeUserTasksRef.current = null;
+    };
+  }, [user?.uid, authLoading]);
+
+  // ── Shared project listeners (one per shared project) ─────────────────────
+  // Adds/removes listeners as the projects list changes. Existing listeners are
+  // reused (not torn down) when unrelated projects change, so members always
+  // receive real-time updates regardless of which project is currently active.
   useEffect(() => {
     if (!user || authLoading || isHydratingRef.current) return;
 
-    // Cleanup old listeners
-    if (unsubscribeUserTasksRef.current) {
-      unsubscribeUserTasksRef.current();
-      unsubscribeUserTasksRef.current = null;
-    }
-    if (unsubscribeSharedProjectRef.current) {
-      unsubscribeSharedProjectRef.current();
-      unsubscribeSharedProjectRef.current = null;
-    }
+    const sharedProjects = projects.filter(
+      (p) => p.id !== 'default' && (p.members?.length > 0 || p.inviteEnabled === true)
+    );
+    const sharedProjectIds = sharedProjects.map((p) => p.id);
 
-    // Determine if current project is shared (using ref to avoid dependency)
-    const currentProject = projectsRef.current.find(p => p.id === activeProjectId);
-    const isSharedProject = currentProject && (currentProject.members?.length > 0 || currentProject.inviteEnabled === true);
+    // Add listeners for projects that don't have one yet
+    sharedProjectIds.forEach((pid) => {
+      if (!sharedListenersRef.current[pid]) {
+        console.log('Setting up shared project listener:', pid);
+        sharedListenersRef.current[pid] = onSharedProjectTasksChange(
+          pid,
+          (data) => handleSharedProjectUpdateRef.current(pid, data)
+        );
+      }
+    });
 
-    if (isSharedProject && activeProjectId !== 'default') {
-      // Setup listener for shared project tasks
-      console.log('Setting up listener for shared project:', activeProjectId);
-      unsubscribeSharedProjectRef.current = onSharedProjectTasksChange(activeProjectId, ({
-        tasks: sharedProjectTasks,
-        members: sharedMembers,
-        memberEmails: sharedMemberEmails,
-        displayMode,
-        groupByDay,
-        color,
-        name,
-        description,
-        kanbanStages,
-      }) => {
-        // Prevent loop: only update if not currently receiving from listener
-        if (isReceivingFromListenerRef.current) {
-          console.log('Skipping update - already receiving from listener');
-          return;
-        }
-        
-        isReceivingFromListenerRef.current = true;
-        
-        // Update project metadata + members if changed
-        setProjects((prevProjects) => {
-          const updated = prevProjects.map((p) =>
-            p.id === activeProjectId
-              ? {
-                  ...p,
-                  members: sharedMembers,
-                  memberEmails: sharedMemberEmails,
-                  ...(displayMode !== undefined && { displayMode }),
-                  ...(groupByDay !== undefined && { groupByDay }),
-                  ...(color !== undefined && { color }),
-                  ...(name !== undefined && { name }),
-                  ...(description !== undefined && { description }),
-                  ...(kanbanStages !== undefined && { kanbanStages }),
-                }
-              : p
-          );
-          localStorage.setItem('rupt_projects', JSON.stringify(updated));
-          return updated;
-        });
-        
-        // Deduplicate incoming tasks (safety check)
-        const uniqueSharedTasks = deduplicateTasks(sharedProjectTasks);
-        
-        // Merge: replace tasks for this project, keep all other project tasks
-        setTasks((prevTasks) => {
-          const otherProjectTasks = prevTasks.filter(t => t.projectId !== activeProjectId);
-          const merged = [...uniqueSharedTasks, ...otherProjectTasks];
-          const dedupedMerged = deduplicateTasks(merged);
-          console.log(`Merged tasks for shared project ${activeProjectId}: ${uniqueSharedTasks.length} from shared + ${otherProjectTasks.length} from other = ${dedupedMerged.length} total`);
-          return dedupedMerged;
-        });
-        
-        // Reset flag after a delay
-        setTimeout(() => { 
-          isReceivingFromListenerRef.current = false; 
-          console.log('Listener flag reset');
-        }, 1000);
-      });
-    } else {
-      // Setup listener for personal user tasks
-      console.log('Setting up listener for user personal tasks');
-      unsubscribeUserTasksRef.current = onUserTasksChange(user.uid, ({ tasks: personalTasks, projects: firestoreProjects }) => {
-        // Prevent loop: only update if not currently receiving from listener or hydrating
-        if (isReceivingFromListenerRef.current || isHydratingRef.current) {
-          console.log('Skipping personal tasks update - receiving or hydrating');
-          return;
-        }
-        
-        isReceivingFromListenerRef.current = true;
+    // Remove listeners for projects no longer in the list
+    const activeIds = new Set(sharedProjectIds);
+    Object.keys(sharedListenersRef.current).forEach((pid) => {
+      if (!activeIds.has(pid)) {
+        console.log('Removing shared project listener:', pid);
+        sharedListenersRef.current[pid]();
+        delete sharedListenersRef.current[pid];
+      }
+    });
 
-        // Update projects from Firebase if available (picks up changes from other devices)
-        if (firestoreProjects && firestoreProjects.length > 0) {
-          setProjects((prevProjects) => {
-            // Keep shared projects (not owned by user) + default, merge with Firebase data
-            const sharedOnlyProjects = prevProjects.filter(
-              (p) => p.id !== 'default' && p.adminId !== user.uid
-            );
-            const merged = [
-              ...firestoreProjects,
-              ...sharedOnlyProjects.filter((sp) => !firestoreProjects.some((fp) => fp.id === sp.id)),
-            ];
-            localStorage.setItem('rupt_projects', JSON.stringify(merged));
-            return merged;
-          });
-        }
-        
-        // Deduplicate incoming tasks (safety check)
-        const uniquePersonalTasks = deduplicateTasks(personalTasks);
-        
-        // Merge: replace personal project tasks, keep shared project tasks
-        setTasks((prevTasks) => {
-          const sharedProjectTasks = prevTasks.filter(t => {
-            const proj = projectsRef.current.find(p => p.id === t.projectId);
-            return proj && proj.members && proj.members.length > 0;
-          });
-          const merged = [...uniquePersonalTasks, ...sharedProjectTasks];
-          const dedupedMerged = deduplicateTasks(merged);
-          console.log(`Merged personal tasks: ${uniquePersonalTasks.length} personal + ${sharedProjectTasks.length} shared = ${dedupedMerged.length} total`);
-          return dedupedMerged;
-        });
-        
-        // Reset flag after a delay
-        setTimeout(() => { 
-          isReceivingFromListenerRef.current = false;
-          console.log('Listener flag reset');
-        }, 1000);
-      });
-    }
-
-    // Cleanup on unmount
     return () => {
-      if (unsubscribeUserTasksRef.current) {
-        unsubscribeUserTasksRef.current();
-        unsubscribeUserTasksRef.current = null;
-      }
-      if (unsubscribeSharedProjectRef.current) {
-        unsubscribeSharedProjectRef.current();
-        unsubscribeSharedProjectRef.current = null;
-      }
+      // Full cleanup on unmount or user change
+      Object.values(sharedListenersRef.current).forEach((unsub) => unsub());
+      sharedListenersRef.current = {};
     };
-  }, [user, activeProjectId, authLoading, projects.find(p => p.id === activeProjectId)?.inviteEnabled]);
+  // Recompute when the set of shared project IDs changes
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, authLoading, projects.filter(p => p.members?.length > 0 || p.inviteEnabled).map(p => p.id).join(',')]);
 
   // Save tasks to storage whenever they change
   useEffect(() => {
     saveTasks(tasks);
+  }, [tasks]);
+
+  // Deferred Firestore sync: fires after React finishes a batched state update
+  // triggered by a user action (tasksSyncPendingRef = true).
+  // Listener-driven updates do NOT set this flag, so they never trigger a write-back.
+  useEffect(() => {
+    if (!tasksSyncPendingRef.current) return;
+    tasksSyncPendingRef.current = false;
+    syncToFirestore(tasks, settings);
+  // Only track `tasks` — settings changes call syncToFirestore directly (handleSaveSettings)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tasks]);
 
   // Update timer for running task using timestamp-based approach
@@ -952,12 +949,6 @@ function AppContent() {
 
   const syncToFirestore = async (tasksToSync, settingsToSync) => {
     if (!user) return;
-    
-    // Prevent sync during listener updates to avoid loops
-    if (isReceivingFromListenerRef.current) {
-      console.log('Skipping sync - currently receiving from listener');
-      return;
-    }
     
     // Determine if current project is shared
     const currentProject = projects.find(p => p.id === activeProjectId);
@@ -1290,8 +1281,7 @@ function AppContent() {
       }
 
       const newTasksList = [newTask, ...updatedTasks];
-      // Sync to Firestore
-      syncToFirestore(newTasksList, settings);
+      tasksSyncPendingRef.current = true;
       return newTasksList;
     });
 
@@ -1306,38 +1296,25 @@ function AppContent() {
   };
 
   const startTask = (taskId) => {
-    // Find the task to get its current duration
-    const taskToStart = tasks.find(t => t.id === taskId);
+    const taskToStart = tasks.find((t) => t.id === taskId);
     if (taskToStart) {
       timerBaseDurationRef.current = taskToStart.totalDurationSeconds;
     }
 
     setTasks((prevTasks) => {
-      let updatedTasks = prevTasks;
-
-      // Pause current running task
+      let updated = prevTasks;
       if (runningTaskId && runningTaskId !== taskId) {
-        updatedTasks = prevTasks.map((task) =>
-          task.id === runningTaskId
-            ? { ...task, status: 'paused' }
-            : task
+        updated = prevTasks.map((task) =>
+          task.id === runningTaskId ? { ...task, status: 'paused' } : task
         );
       }
-
-      // Start the new task
-      updatedTasks = updatedTasks.map((task) =>
+      updated = updated.map((task) =>
         task.id === taskId
-          ? {
-              ...task,
-              status: 'running',
-              startedAt: new Date().toISOString(),
-            }
+          ? { ...task, status: 'running', startedAt: new Date().toISOString() }
           : task
       );
-
-      // Sync to Firestore
-      syncToFirestore(updatedTasks, settings);
-      return updatedTasks;
+      tasksSyncPendingRef.current = true;
+      return updated;
     });
 
     setRunningTaskId(taskId);
@@ -1348,13 +1325,11 @@ function AppContent() {
       const updated = prevTasks.map((task) =>
         task.id === taskId ? { ...task, status: 'paused' } : task
       );
-      // Sync to Firestore after pause
-      syncToFirestore(updated, settings);
+      tasksSyncPendingRef.current = true;
       return updated;
     });
     setRunningTaskId(null);
     timerBaseDurationRef.current = 0;
-    // Clear notification reference when task pauses
     delete lastNotificationRef.current[taskId];
   };
 
@@ -1362,31 +1337,20 @@ function AppContent() {
     setTasks((prevTasks) => {
       const updated = prevTasks.map((task) => {
         if (task.id === taskId) {
-          // Don't apply rounding if task was manually edited
-          const roundedSeconds = task.manuallyEdited 
+          const roundedSeconds = task.manuallyEdited
             ? task.totalDurationSeconds
-            : roundSeconds(
-                task.totalDurationSeconds,
-                settings.roundingMode,
-                settings.roundingStep
-              );
-          return {
-            ...task,
-            totalDurationSeconds: roundedSeconds,
-            status: 'completed',
-          };
+            : roundSeconds(task.totalDurationSeconds, settings.roundingMode, settings.roundingStep);
+          return { ...task, totalDurationSeconds: roundedSeconds, status: 'completed' };
         }
         return task;
       });
-      // Sync to Firestore after complete
-      syncToFirestore(updated, settings);
+      tasksSyncPendingRef.current = true;
       return updated;
     });
     if (runningTaskId === taskId) {
       setRunningTaskId(null);
       timerBaseDurationRef.current = 0;
     }
-    // Clear notification reference when task completes
     delete lastNotificationRef.current[taskId];
   };
 
@@ -1407,10 +1371,9 @@ function AppContent() {
   const updateTask = (taskId, field, value) => {
     setTasks((prevTasks) => {
       const updated = prevTasks.map((task) =>
-        task.id === taskId
-          ? { ...task, [field]: value }
-          : task
+        task.id === taskId ? { ...task, [field]: value } : task
       );
+      tasksSyncPendingRef.current = true;
       return updated;
     });
   };
@@ -1418,12 +1381,9 @@ function AppContent() {
   const assignTask = (taskId, assignedToEmail) => {
     setTasks((prevTasks) => {
       const updated = prevTasks.map((task) =>
-        task.id === taskId
-          ? { ...task, assignedTo: assignedToEmail }
-          : task
+        task.id === taskId ? { ...task, assignedTo: assignedToEmail } : task
       );
-      // Sync to Firestore after assigning
-      syncToFirestore(updated, settings);
+      tasksSyncPendingRef.current = true;
       return updated;
     });
   };
@@ -1432,30 +1392,16 @@ function AppContent() {
     setTasks((prevTasks) => {
       const updated = prevTasks.map((task) => {
         if (task.id === taskId) {
-          // Add marker to details (description field) if not already present
           const marker = '*Contador manipulado manualmente';
           let newDetails = task.details || '';
-          
           if (!newDetails.includes(marker)) {
-            // Add marker at the end
-            if (newDetails.trim()) {
-              newDetails = newDetails.trim() + ' ' + marker;
-            } else {
-              newDetails = marker;
-            }
+            newDetails = newDetails.trim() ? newDetails.trim() + ' ' + marker : marker;
           }
-          
-          return {
-            ...task,
-            totalDurationSeconds: newSeconds,
-            manuallyEdited: true,
-            details: newDetails,
-          };
+          return { ...task, totalDurationSeconds: newSeconds, manuallyEdited: true, details: newDetails };
         }
         return task;
       });
-      // Sync to Firestore after manual edit
-      syncToFirestore(updated, settings);
+      tasksSyncPendingRef.current = true;
       return updated;
     });
   };
@@ -1465,8 +1411,7 @@ function AppContent() {
       const updated = prevTasks.map((task) =>
         task.id === taskId ? { ...task, status: 'paused' } : task
       );
-      // Sync to Firestore
-      syncToFirestore(updated, settings);
+      tasksSyncPendingRef.current = true;
       return updated;
     });
   };
@@ -1474,21 +1419,51 @@ function AppContent() {
   const deleteTask = (taskId) => {
     setTasks((prevTasks) => {
       const updated = prevTasks.filter((task) => task.id !== taskId);
-      // Sync to Firestore after delete
-      syncToFirestore(updated, settings);
+      tasksSyncPendingRef.current = true;
       return updated;
     });
     if (runningTaskId === taskId) {
       setRunningTaskId(null);
     }
-    // Clear notification reference when task is deleted
     delete lastNotificationRef.current[taskId];
   };
 
   const reorderTasks = (reorderedTasks) => {
     setTasks(reorderedTasks);
-    // Sync reordering to Firestore
-    syncToFirestore(reorderedTasks, settings);
+    tasksSyncPendingRef.current = true;
+  };
+
+  // Atomic handler for moving a card between Kanban stages.
+  // Combines the kanbanStageId update + status/timer change in ONE setTasks call so
+  // both fields are written together — no partial-state window.
+  const moveTaskToStage = (taskId, stageId, shouldRun) => {
+    setTasks((prevTasks) => {
+      const updated = prevTasks.map((task) => {
+        if (task.id === taskId) {
+          return {
+            ...task,
+            kanbanStageId: stageId,
+            status: shouldRun ? 'running' : 'paused',
+            ...(shouldRun ? { startedAt: new Date().toISOString() } : {}),
+          };
+        }
+        // Pause any other currently-running task when starting a new one
+        if (shouldRun && task.id === runningTaskId && task.id !== taskId) {
+          return { ...task, status: 'paused' };
+        }
+        return task;
+      });
+      tasksSyncPendingRef.current = true;
+      return updated;
+    });
+    if (shouldRun) {
+      const taskToRun = tasks.find((t) => t.id === taskId);
+      timerBaseDurationRef.current = taskToRun?.totalDurationSeconds ?? 0;
+      setRunningTaskId(taskId);
+    } else if (runningTaskId === taskId) {
+      setRunningTaskId(null);
+      timerBaseDurationRef.current = 0;
+    }
   };
 
   const handleSaveSettings = (newSettings, newTasks = []) => {
@@ -1942,6 +1917,7 @@ function AppContent() {
               currentUserEmail={user?.email || 'Anonymous'}
               currentUserDisplayName={user?.displayName || user?.email?.split('@')[0] || ''}
               onUpdateStages={handleUpdateKanbanStages}
+              onMoveToStage={moveTaskToStage}
             />
           ) : displayMode === 'KANBAN' ? (
             // KANBAN MODE: Display tasks in columns by assignee

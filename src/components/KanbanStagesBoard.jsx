@@ -25,6 +25,7 @@ function KanbanStagesBoard({
   currentUserEmail,
   currentUserDisplayName,
   onUpdateStages,
+  onMoveToStage,
 }) {
   const stages =
     currentProject?.kanbanStages && currentProject.kanbanStages.length > 0
@@ -71,12 +72,15 @@ function KanbanStagesBoard({
     const task = tasks.find((t) => t.id === draggedTaskId);
     if (!task) return;
     if (task.kanbanStageId !== stageId) {
-      onUpdateTask(task.id, 'kanbanStageId', stageId);
       const targetStage = stages.find((s) => s.id === stageId);
-      if (targetStage?.countsTime === false) {
-        onPause(task.id);
+      const shouldRun = targetStage?.countsTime !== false;
+      // Atomic: update stage + status/timer in one operation
+      if (onMoveToStage) {
+        onMoveToStage(task.id, stageId, shouldRun);
       } else {
-        onStart(task.id);
+        onUpdateTask(task.id, 'kanbanStageId', stageId);
+        if (!shouldRun) onPause(task.id);
+        else onStart(task.id);
       }
     }
     setDraggedTaskId(null);
