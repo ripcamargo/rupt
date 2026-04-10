@@ -19,6 +19,7 @@ import { DEFAULT_SETTINGS, loadSettings, saveSettings } from './utils/settings';
 import { roundSeconds } from './utils/rounding';
 import { requestNotificationPermission, notifyTaskReminder } from './utils/notifications';
 import { auth } from './utils/firebase';
+import { openPip, CHANNEL_NAME } from './utils/pip';
 import { loadUserData, saveUserData, saveSharedProject, loadSharedProjectsForUser, onSharedProjectTasksChange, onUserTasksChange, saveSharedProjectTasks, joinProjectViaInvite } from './utils/firestore';
 import { onAuthStateChanged, sendEmailVerification } from 'firebase/auth';
 import './App.css';
@@ -325,7 +326,7 @@ function AppContent() {
           setSettings(mergedSettings);
           setProjects(allProjects);
           setActiveProjectId(mergedActiveProjectId);
-          setUserPhoto(remoteData.photoURL || null);
+          setUserPhoto(remoteData.photoURL || currentUser.photoURL || null);
           saveTasks(cleanedTasks);
           saveSettings(mergedSettings);
           localStorage.setItem('rupt_projects', JSON.stringify(allProjects));
@@ -358,7 +359,7 @@ function AppContent() {
             settings: mergedSettings,
             projects: allProjects,
             activeProjectId: mergedActiveProjectId,
-            photoURL: remoteData.photoURL,
+            photoURL: remoteData.photoURL || currentUser.photoURL || null,
           });
         } else {
           // No remote data - first time login for this user
@@ -382,6 +383,7 @@ function AppContent() {
           setSettings(localSettings);
           setProjects(allProjects);
           setActiveProjectId(localActiveProjectId);
+          setUserPhoto(currentUser.photoURL || null);
           localStorage.setItem('rupt_projects', JSON.stringify(allProjects));
           console.log('Setting projects on first login:', allProjects);
 
@@ -403,7 +405,7 @@ function AppContent() {
             settings: localSettings,
             projects: allProjects,
             activeProjectId: localActiveProjectId,
-            photoURL: null,
+            photoURL: currentUser.photoURL || null,
           });
         }
 
@@ -505,6 +507,18 @@ function AppContent() {
       }
     }
   }, [location.search, user, authLoading]);
+
+  // Listen for tasks created from PiP mini window
+  useEffect(() => {
+    const channel = new BroadcastChannel(CHANNEL_NAME);
+    channel.onmessage = (event) => {
+      if (event.data?.type === 'CREATE_TASK' && event.data.description?.trim()) {
+        createTaskWithData(event.data.description.trim(), '', '');
+      }
+    };
+    return () => channel.close();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeProjectId, runningTaskId, settings]);
 
   // Listen for pending tasks from extension via content script
   useEffect(() => {
@@ -979,12 +993,14 @@ function AppContent() {
     // If project has members, save it as a shared project in Firestore
     if (updatedProject.members && updatedProject.members.length > 0) {
       console.log('Saving shared project with members:', updatedProject.members);
-      await saveSharedProject(updatedProject);
       
-      // Also save tasks for this shared project
+      // Save tasks FIRST to avoid the listener receiving empty tasks when the
+      // project document is overwritten. Both writes use merge:true.
       const projectTasks = tasks.filter(t => t.projectId === updatedProject.id);
       console.log(`Saving ${projectTasks.length} tasks for shared project ${updatedProject.id}`);
       await saveSharedProjectTasks(updatedProject.id, projectTasks);
+      
+      await saveSharedProject(updatedProject);
     }
     
     if (user) {
@@ -1138,8 +1154,14 @@ function AppContent() {
     const isDefaultProject = activeProjectId === 'default';
     
     // Always assign task to current user when creating
-    // Task starts running automatically (as it does today)
     const assignedToEmail = user?.email || 'Anonymous';
+
+    // In KANBAN_STAGES mode, new tasks land in the first stage.
+    // If that stage has countsTime === false, start the task paused.
+    const projectDisplayMode = currentProject?.displayMode || 'LIST';
+    const firstStage = currentProject?.kanbanStages?.[0];
+    const shouldAutoStart =
+      projectDisplayMode !== 'KANBAN_STAGES' || firstStage?.countsTime !== false;
     
     const newTask = {
       id: Date.now(),
@@ -1147,19 +1169,19 @@ function AppContent() {
       details: details,
       requester: requester,
       createdAt: new Date().toISOString(),
-      startedAt: new Date().toISOString(),
+      startedAt: shouldAutoStart ? new Date().toISOString() : null,
       totalDurationSeconds: 0,
-      status: 'running', // Always starts running when created
+      status: shouldAutoStart ? 'running' : 'paused',
       isUrgent: false,
       customOrderDate: null,
       projectId: activeProjectId,
-      assignedTo: assignedToEmail, // Task assigned to creator (current user)
+      assignedTo: assignedToEmail,
     };
 
     setTasks((prevTasks) => {
-      // Pause current running task if exists
+      // Pause current running task only if the new task will also run
       let updatedTasks = prevTasks;
-      if (runningTaskId) {
+      if (shouldAutoStart && runningTaskId) {
         updatedTasks = prevTasks.map((task) =>
           task.id === runningTaskId
             ? { ...task, status: 'paused' }
@@ -1173,8 +1195,10 @@ function AppContent() {
       return newTasksList;
     });
 
-    setRunningTaskId(newTask.id);
-    timerBaseDurationRef.current = 0;
+    if (shouldAutoStart) {
+      setRunningTaskId(newTask.id);
+      timerBaseDurationRef.current = 0;
+    }
     setInput('');
     setStep('description');
     setTempDescription('');
@@ -1281,13 +1305,14 @@ function AppContent() {
   };
 
   const updateTask = (taskId, field, value) => {
-    setTasks((prevTasks) =>
-      prevTasks.map((task) =>
+    setTasks((prevTasks) => {
+      const updated = prevTasks.map((task) =>
         task.id === taskId
           ? { ...task, [field]: value }
           : task
-      )
-    );
+      );
+      return updated;
+    });
   };
 
   const assignTask = (taskId, assignedToEmail) => {
@@ -1580,6 +1605,15 @@ function AppContent() {
             <span className="time">{formatTime(totalTimeToday)}</span>
           </div>
           <div className="header-actions">
+            {window.documentPictureInPicture && (
+              <button
+                className="btn-pip"
+                onClick={() => openPip(projects.find(p => p.id === activeProjectId)?.name, () => {})}
+                title="Abrir mini janela flutuante"
+              >
+                ⊡
+              </button>
+            )}
             {user ? (
               <div className="user-status" onClick={() => setIsProfileModalOpen(true)} style={{ cursor: 'pointer' }}>
                 {userPhoto ? (

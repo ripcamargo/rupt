@@ -68,7 +68,7 @@ export const saveSharedProject = async (project) => {
       ...project,
       memberEmails, // Add flat array of emails for querying
       updatedAt: serverTimestamp(),
-    });
+    }, { merge: true });
     
     console.log('Successfully saved shared project:', project.id);
   } catch (error) {
