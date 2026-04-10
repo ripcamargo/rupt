@@ -164,9 +164,13 @@ function AppContent() {
         description: p.description || '',
         displayMode: p.displayMode || 'LIST',
         color: p.color || '#4adeb9',
+        groupByDay: p.groupByDay !== undefined ? p.groupByDay : true,
         members: p.members || [],
         adminId: p.adminId || 'local_user',
         adminEmail: p.adminEmail || 'Anonymous',
+        ...(p.inviteEnabled !== undefined ? { inviteEnabled: p.inviteEnabled } : {}),
+        ...(p.kanbanStages ? { kanbanStages: p.kanbanStages } : {}),
+        ...(p.adminId && p.adminId !== 'local_user' ? {} : {}),
       }));
     } else {
       // Initialize with default project
@@ -733,7 +737,7 @@ function AppContent() {
         unsubscribeSharedProjectRef.current = null;
       }
     };
-  }, [user, activeProjectId, authLoading]);
+  }, [user, activeProjectId, authLoading, projects.find(p => p.id === activeProjectId)?.inviteEnabled]);
 
   // Save tasks to storage whenever they change
   useEffect(() => {
