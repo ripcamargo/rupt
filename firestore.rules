@@ -40,10 +40,7 @@ service cloud.firestore {
       // Create only by admin creating their own project
       allow create: if isAuthenticated()
         && request.resource.data.id == projectId
-        && request.resource.data.adminId == request.auth.uid
-        && request.resource.data.memberEmails is list
-        && userEmail() != null
-        && userEmail().lower() in request.resource.data.memberEmails;
+        && request.resource.data.adminId == request.auth.uid;
 
       // Admin can update all fields.
       // Members can update tasks/time fields but cannot change project metadata/permissions.
