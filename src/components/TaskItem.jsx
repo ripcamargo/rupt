@@ -26,6 +26,7 @@ function TaskItem({
   isDefaultProject,
   currentProject,
   currentUserEmail,
+  currentUserDisplayName = '',
   isKanbanView = false,
 }) {
   const [editingField, setEditingField] = useState(null);
@@ -183,7 +184,7 @@ function TaskItem({
                   />
                 ) : (
                   task.requester ? (
-                    <span className="requester-label">Solicitante: <span className="requester-name">{task.requester}</span></span>
+                    <span className="requester-name">{task.requester}</span>
                   ) : (
                     isEditMode && <span className="placeholder-text">Clique duas vezes para adicionar solicitante</span>
                   )
@@ -191,9 +192,18 @@ function TaskItem({
               </div>
             )}
 
-            {/* 4. Horário e Tempo lado a lado */}
+            {/* 4. Responsável e Tempo lado a lado */}
             <div className="task-time-row">
-              <span className="task-start-time">Início: {startTime}</span>
+              {!isDefaultProject && (
+                <span className="task-assignee-inline">
+                  {(() => {
+                    const assignedEmail = task.assignedTo || currentUserEmail;
+                    if (assignedEmail === currentUserEmail) return currentUserDisplayName || currentUserEmail?.split('@')[0];
+                    const member = currentProject?.members?.find(m => m.email === assignedEmail);
+                    return member?.name || assignedEmail?.split('@')[0];
+                  })()}
+                </span>
+              )}
               <div 
                 className={`task-time ${isEditMode ? 'editable' : ''}`}
                 onDoubleClick={() => handleDoubleClick('time', task.totalDurationSeconds)}
@@ -301,7 +311,7 @@ function TaskItem({
                         autoFocus
                         className="task-edit-select"
                       >
-                        <option value={currentUserEmail}>Eu</option>
+                        <option value={currentUserEmail}>{currentUserDisplayName || currentUserEmail?.split('@')[0]}</option>
                         {currentProject?.members?.filter(m => m.email !== currentUserEmail).map((member) => (
                           <option key={member.email} value={member.email}>
                             {member.name || member.email?.split('@')[0]}
@@ -312,7 +322,7 @@ function TaskItem({
                       <span className="assigned-to-name">
                         {(() => {
                           const assignedEmail = task.assignedTo || currentUserEmail;
-                          if (assignedEmail === currentUserEmail) return 'Responsável: Eu';
+                          if (assignedEmail === currentUserEmail) return `Responsável: ${currentUserDisplayName || currentUserEmail?.split('@')[0]}`;
                           const member = currentProject?.members?.find(m => m.email === assignedEmail);
                           return `Responsável: ${member?.name || assignedEmail?.split('@')[0]}`;
                         })()}

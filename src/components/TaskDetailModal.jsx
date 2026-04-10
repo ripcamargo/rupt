@@ -3,7 +3,7 @@ import { formatDurationForEdit, parseTimeToSeconds, formatDuration } from '../ut
 import { uploadTaskAttachment, deleteTaskAttachment } from '../utils/storageUpload';
 import '../styles/TaskDetailModal.css';
 
-function TaskDetailModal({ task, isRunning, elapsedSeconds, onClose, onUpdateTask, onEditTime, onDelete, currentProject, currentUserEmail, isDefaultProject }) {
+function TaskDetailModal({ task, isRunning, elapsedSeconds, onClose, onUpdateTask, onEditTime, onDelete, currentProject, currentUserEmail, currentUserDisplayName, isDefaultProject }) {
   const [description, setDescription] = useState('');
   const [details, setDetails] = useState('');
   const [requester, setRequester] = useState('');
@@ -174,7 +174,7 @@ function TaskDetailModal({ task, isRunning, elapsedSeconds, onClose, onUpdateTas
                 value={task.assignedTo || currentUserEmail}
                 onChange={(e) => onUpdateTask(task.id, 'assignedTo', e.target.value)}
               >
-                <option value={currentUserEmail}>Eu ({currentUserEmail?.split('@')[0]})</option>
+                <option value={currentUserEmail}>{currentUserDisplayName || currentUserEmail?.split('@')[0]}</option>
                 {currentProject?.members?.filter(m => m.email !== currentUserEmail).map((member) => (
                   <option key={member.email} value={member.email}>
                     {member.name || member.email?.split('@')[0]}

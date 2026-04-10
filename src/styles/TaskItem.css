@@ -642,9 +642,13 @@
   margin: 0.25rem 0;
 }
 
-.task-item.kanban-view .task-start-time {
+.task-item.kanban-view .task-assignee-inline {
   color: #999;
   font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 50%;
 }
 
 .task-item.kanban-view .task-time {

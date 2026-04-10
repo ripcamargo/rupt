@@ -1744,7 +1744,7 @@ function AppContent() {
                 {/* Admin */}
                 <option value={activeProject.adminEmail}>
                   {activeProject.adminEmail === user?.email 
-                    ? 'Eu (ADM)' 
+                    ? `${user?.displayName || user?.email?.split('@')[0]} (ADM)` 
                     : `${(() => {
                         const adminMember = activeProject.members?.find(m => m.email === activeProject.adminEmail);
                         return adminMember?.name || activeProject.adminEmail?.split('@')[0] || 'Admin';
@@ -1754,7 +1754,7 @@ function AppContent() {
                 {activeProject.members?.filter(m => m.email !== activeProject.adminEmail).map((member, index) => (
                   <option key={index} value={member.email}>
                     {member.email === user?.email 
-                      ? 'Eu' 
+                      ? (user?.displayName || user?.email?.split('@')[0]) 
                       : member.name || member.email?.split('@')[0] || member.email}
                   </option>
                 ))}
@@ -1840,6 +1840,7 @@ function AppContent() {
               currentProject={activeProject}
               isDefaultProject={activeProjectId === 'default'}
               currentUserEmail={user?.email || 'Anonymous'}
+              currentUserDisplayName={user?.displayName || user?.email?.split('@')[0] || ''}
               onUpdateStages={handleUpdateKanbanStages}
             />
           ) : displayMode === 'KANBAN' ? (
@@ -1860,6 +1861,7 @@ function AppContent() {
                 currentProject={activeProject}
                 isDefaultProject={activeProjectId === 'default'}
                 currentUserEmail={user?.email || 'Anonymous'}
+                currentUserDisplayName={user?.displayName || user?.email?.split('@')[0] || ''}
               />
             ) : (
               <div className="empty-state">
@@ -1900,6 +1902,7 @@ function AppContent() {
                     isDefaultProject={activeProjectId === 'default'}
                     currentProject={activeProject}
                     currentUserEmail={user?.email || 'Anonymous'}
+                    currentUserDisplayName={user?.displayName || user?.email?.split('@')[0] || ''}
                   />
                 ))}
               </div>
@@ -1932,6 +1935,7 @@ function AppContent() {
                     currentProject={currentProject}
                     isDefaultProject={isDefaultProject}
                     currentUserEmail={user?.email || 'Anonymous'}
+                    currentUserDisplayName={user?.displayName || user?.email?.split('@')[0] || ''}
                     displayMode={displayMode}
                   />
                 );

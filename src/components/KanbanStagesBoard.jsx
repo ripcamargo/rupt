@@ -23,6 +23,7 @@ function KanbanStagesBoard({
   currentProject,
   isDefaultProject,
   currentUserEmail,
+  currentUserDisplayName,
   onUpdateStages,
 }) {
   const stages =
@@ -284,6 +285,7 @@ function KanbanStagesBoard({
                       isDefaultProject={isDefaultProject}
                       currentProject={currentProject}
                       currentUserEmail={currentUserEmail}
+                      currentUserDisplayName={currentUserDisplayName}
                       isKanbanView={true}
                     />
                   </div>
@@ -344,6 +346,7 @@ function KanbanStagesBoard({
           onDelete={(id) => { onDelete(id); setSelectedTask(null); }}
           currentProject={currentProject}
           currentUserEmail={currentUserEmail}
+          currentUserDisplayName={currentUserDisplayName}
           isDefaultProject={isDefaultProject}
         />
       )}

@@ -21,6 +21,7 @@ function DayGroup({
   currentProject,
   isDefaultProject,
   currentUserEmail,
+  currentUserDisplayName = '',
   displayMode = 'LIST',
 }) {
   const [isExpanded, setIsExpanded] = useState(isToday(tasks[0].createdAt));
@@ -186,6 +187,7 @@ function DayGroup({
               isDefaultProject={isDefaultProject}
               currentProject={currentProject}
               currentUserEmail={currentUserEmail}
+              currentUserDisplayName={currentUserDisplayName}
             />
           ))}
         </div>

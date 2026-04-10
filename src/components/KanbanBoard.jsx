@@ -17,6 +17,7 @@ function KanbanBoard({
   currentProject,
   isDefaultProject,
   currentUserEmail,
+  currentUserDisplayName = '',
 }) {
   const [draggedTaskId, setDraggedTaskId] = useState(null);
   const [dragOverColumn, setDragOverColumn] = useState(null);
@@ -106,7 +107,8 @@ function KanbanBoard({
 
   const getMemberDisplayName = (member) => {
     if (member.email === currentUserEmail) {
-      return member.isAdmin ? 'Eu (ADM)' : 'Eu';
+      const name = currentUserDisplayName || member.name || currentUserEmail?.split('@')[0];
+      return member.isAdmin ? `${name} (ADM)` : name;
     }
     return member.isAdmin ? `${member.name} (ADM)` : member.name;
   };
@@ -180,6 +182,7 @@ function KanbanBoard({
                       isDefaultProject={isDefaultProject}
                       currentProject={currentProject}
                       currentUserEmail={currentUserEmail}
+                      currentUserDisplayName={currentUserDisplayName}
                       isKanbanView={true}
                     />
                   </div>
