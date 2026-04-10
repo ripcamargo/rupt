@@ -258,8 +258,9 @@ function KanbanStagesBoard({
                     onDragStart={() => handleDragStart(task.id)}
                     onDragEnd={handleDragEnd}
                     onClick={(e) => {
-                      // Only open modal on direct click (not after a drag)
-                      if (!draggedTaskId) setSelectedTask(task);
+                      if (!draggedTaskId && !e.target.closest('button, select, input, a')) {
+                        setSelectedTask(task);
+                      }
                     }}
                   >
                     <TaskItem
