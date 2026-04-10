@@ -6,7 +6,7 @@ import { loadSharedProject, joinProjectViaInvite, saveUserData } from '../utils/
 import '../styles/JoinProjectPage.css';
 
 function JoinProjectPage({ onOpenAuth }) {
-  const { projectId, inviteToken } = useParams();
+  const { projectId } = useParams();
   const navigate = useNavigate();
 
   const [project, setProject] = useState(null);
@@ -32,9 +32,9 @@ function JoinProjectPage({ onOpenAuth }) {
           setErrorMsg('Projeto não encontrado. O link pode ser inválido ou o projeto foi excluído.');
           return;
         }
-        if (!data.inviteToken || data.inviteToken !== inviteToken) {
+        if (data.inviteEnabled === false) {
           setPageState('invalid');
-          setErrorMsg('Este link de convite é inválido ou foi revogado pelo administrador.');
+          setErrorMsg('Este link de convite foi desativado pelo administrador.');
           return;
         }
         setProject(data);
@@ -56,7 +56,7 @@ function JoinProjectPage({ onOpenAuth }) {
     };
 
     load();
-  }, [user, projectId, inviteToken]);
+  }, [user, projectId]);
 
   const handleJoin = async () => {
     if (!user) {
@@ -67,7 +67,6 @@ function JoinProjectPage({ onOpenAuth }) {
     try {
       const updatedProject = await joinProjectViaInvite(
         projectId,
-        inviteToken,
         user.email,
         user.displayName || user.email.split('@')[0]
       );

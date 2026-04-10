@@ -193,11 +193,11 @@ export const saveSharedProjectTasks = async (projectId, tasks) => {  try {
 };
 
 // Join a project via an invite link
-export const joinProjectViaInvite = async (projectId, token, userEmail, userName) => {
+export const joinProjectViaInvite = async (projectId, userEmail, userName) => {
   const project = await loadSharedProject(projectId);
   if (!project) throw new Error('Projeto não encontrado. O link pode ser inválido.');
-  if (!project.inviteToken || project.inviteToken !== token) {
-    throw new Error('Link de convite inválido ou já foi revogado.');
+  if (project.inviteEnabled === false) {
+    throw new Error('Este link de convite foi desativado pelo administrador.');
   }
 
   const normalizedEmail = (userEmail || '').trim().toLowerCase();

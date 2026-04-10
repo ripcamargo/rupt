@@ -990,8 +990,8 @@ function AppContent() {
     setProjects(updatedProjects);
     localStorage.setItem('rupt_projects', JSON.stringify(updatedProjects));
     
-    // Save to Firestore if this is a shared project (has members OR has an invite token)
-    const isSharedProject = (updatedProject.members && updatedProject.members.length > 0) || !!updatedProject.inviteToken;
+    // Save to Firestore if this is a shared project (has members OR invite is enabled)
+    const isSharedProject = (updatedProject.members && updatedProject.members.length > 0) || updatedProject.inviteEnabled === true;
     if (isSharedProject && updatedProject.id !== 'default') {
       console.log('Saving shared project with members:', updatedProject.members);
       
@@ -2000,7 +2000,7 @@ function App() {
       <Route path="/" element={<AppContent />} />
       <Route path="/projetos/:projectId" element={<AppContent />} />
       <Route
-        path="/convite/:projectId/:inviteToken"
+        path="/convite/:projectId"
         element={
           <>
             <JoinProjectPage onOpenAuth={() => setIsAuthModalOpen(true)} />

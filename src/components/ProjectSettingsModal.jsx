@@ -2,11 +2,6 @@ import { useState, useEffect } from 'react';
 import { CloseIcon, SettingsIcon } from './Icons';
 import '../styles/ProjectSettingsModal.css';
 
-const generateToken = () =>
-  typeof crypto !== 'undefined' && crypto.randomUUID
-    ? crypto.randomUUID()
-    : Math.random().toString(36).substring(2) + Date.now().toString(36);
-
 function ProjectSettingsModal({ isOpen, onClose, project, currentUserId, user, onOpenAuth, onUpdate, onDelete, onLeaveProject }) {
   const [formData, setFormData] = useState({
     name: '',
@@ -20,7 +15,7 @@ function ProjectSettingsModal({ isOpen, onClose, project, currentUserId, user, o
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
   const [copySuccess, setCopySuccess] = useState(false);
-  const [localInviteToken, setLocalInviteToken] = useState(null);
+  const [localInviteEnabled, setLocalInviteEnabled] = useState(false);
 
   useEffect(() => {
     if (project && isOpen) {
@@ -36,13 +31,7 @@ function ProjectSettingsModal({ isOpen, onClose, project, currentUserId, user, o
       setShowDeleteConfirm(false);
       setShowLeaveConfirm(false);
       setCopySuccess(false);
-      setLocalInviteToken(project.inviteToken || null);
-
-      // If the project has an invite token, force a sync to Firestore
-      // so the token is available even if it was created before the sync fix.
-      if (project.inviteToken && project.id !== 'default') {
-        onUpdate({ ...project });
-      }
+      setLocalInviteEnabled(project.inviteEnabled !== false);
     }
   }, [project?.id, isOpen]);
 
@@ -99,7 +88,7 @@ function ProjectSettingsModal({ isOpen, onClose, project, currentUserId, user, o
       ...project,
       ...formData,
       members,
-      inviteToken: project.inviteToken || null,
+      inviteEnabled: localInviteEnabled,
     });
     onClose();
   };
@@ -297,18 +286,18 @@ function ProjectSettingsModal({ isOpen, onClose, project, currentUserId, user, o
                     Compartilhe este link para convidar pessoas ao projeto. Qualquer pessoa com o link poderá solicitar entrada.
                   </p>
 
-                  {localInviteToken ? (
+                  {localInviteEnabled ? (
                     <>
                       <div className="invite-link-box">
                         <span className="invite-link-text">
-                          {`${window.location.origin}/convite/${project.id}/${localInviteToken}`}
+                          {`${window.location.origin}/convite/${project.id}`}
                         </span>
                         <button
                           type="button"
                           className="btn-copy-link"
                           onClick={() => {
                             navigator.clipboard.writeText(
-                              `${window.location.origin}/convite/${project.id}/${localInviteToken}`
+                              `${window.location.origin}/convite/${project.id}`
                             );
                             setCopySuccess(true);
                             setTimeout(() => setCopySuccess(false), 2000);
@@ -321,11 +310,11 @@ function ProjectSettingsModal({ isOpen, onClose, project, currentUserId, user, o
                         type="button"
                         className="btn-revoke-link"
                         onClick={() => {
-                          setLocalInviteToken(null);
-                          onUpdate({ ...project, inviteToken: null });
+                          setLocalInviteEnabled(false);
+                          onUpdate({ ...project, inviteEnabled: false });
                         }}
                       >
-                        Revogar link
+                        Desativar link
                       </button>
                     </>
                   ) : (
@@ -333,12 +322,11 @@ function ProjectSettingsModal({ isOpen, onClose, project, currentUserId, user, o
                       type="button"
                       className="btn-generate-link"
                       onClick={() => {
-                        const token = generateToken();
-                        setLocalInviteToken(token);
-                        onUpdate({ ...project, inviteToken: token });
+                        setLocalInviteEnabled(true);
+                        onUpdate({ ...project, inviteEnabled: true });
                       }}
                     >
-                      Gerar link de convite
+                      Ativar link de convite
                     </button>
                   )}
                 </div>
