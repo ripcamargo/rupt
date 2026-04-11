@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { updateProfile, updatePassword, reauthenticateWithCredential, EmailAuthProvider, deleteUser } from 'firebase/auth';
 import { auth } from '../utils/firebase';
 import { saveUserData, loadUserData } from '../utils/firestore';
+import { compressImageToDataURL } from '../utils/imageCompressor';
 import { CloseIcon } from './Icons';
 import '../styles/UserProfileModal.css';
 
@@ -54,21 +55,26 @@ function UserProfileModal({ isOpen, onClose, user, userPhoto, onNameUpdate }) {
     onClose();
   };
 
-  const handlePhotoChange = (e) => {
+  const handlePhotoChange = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (file.size > 500000) {
-      setError('Foto muito grande (máximo 500KB)');
+    if (!file.type.startsWith('image/')) {
+      setError('Selecione um arquivo de imagem.');
       return;
     }
 
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      setPhotoBase64(event.target?.result || '');
+    try {
+      const { dataURL } = await compressImageToDataURL(file, {
+        maxWidth: 200,
+        maxHeight: 200,
+        quality: 0.85,
+      });
+      setPhotoBase64(dataURL);
       setError('');
-    };
-    reader.readAsDataURL(file);
+    } catch (err) {
+      setError('Erro ao processar imagem.');
+    }
   };
 
   const handleUpdateProfile = async (e) => {
