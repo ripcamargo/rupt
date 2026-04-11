@@ -370,3 +370,9 @@
 .add-stage-actions .btn-stage-cancel {
   flex: 1;
 }
+
+/* ─── Task card title centered in stages board ───────────── */
+
+.kanban-stages-board .task-item.kanban-view .task-description {
+  text-align: center;
+}
