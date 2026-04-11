@@ -171,6 +171,10 @@ function UserProfileModal({ isOpen, onClose, user, userPhoto }) {
       await reauthenticateWithCredential(user, credential);
       // Wipe Firestore user data, then delete Firebase Auth account
       await saveUserData(user.uid, { tasks: [], settings: null, projects: [], photoURL: null });
+      // Proactively wipe localStorage so the counter shows 0 immediately after reload
+      localStorage.removeItem('rupt_tasks');
+      localStorage.removeItem('rupt_projects');
+      localStorage.removeItem('rupt_active_project');
       await deleteUser(user);
       // Auth state change listener in App.jsx will handle cleanup + navigate
     } catch (err) {

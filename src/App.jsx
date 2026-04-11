@@ -257,7 +257,9 @@ function AppContent() {
 
       if (!currentUser) {
         setUserPhoto(null);
-        // Clear shared projects on logout, keep only default project
+        // Clear all user data from state and localStorage
+        setTasks([]);
+        saveTasks([]);
         const defaultProject = [{
           id: 'default',
           name: 'Minhas Tarefas',
