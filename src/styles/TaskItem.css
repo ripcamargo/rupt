@@ -664,8 +664,10 @@
 }
 
 .task-item.kanban-view .task-assignee-inline-select {
-  max-width: 50%;
+  max-width: 100%;
+  width: 100%;
   color: #999;
+  text-align: center;
 }
 
 .task-item.kanban-view .task-time {
