@@ -744,7 +744,18 @@ function AppContent() {
           (p) => p.id !== 'default' && p.adminId !== user?.uid
         );
         const merged = [
-          ...firestoreProjects,
+          ...firestoreProjects.map((fp) => {
+            // For projects the user joined (not their own), prefer the local copy — it was
+            // updated by the real-time listener and may have a fresher members list than
+            // what is stored in the user's personal /users/{uid} document.
+            if (fp.adminId !== user?.uid) {
+              const localVersion = prevProjects.find((lp) => lp.id === fp.id);
+              if (localVersion && localVersion.members && localVersion.members.length > 0) {
+                return localVersion;
+              }
+            }
+            return fp;
+          }),
           ...sharedOnlyProjects.filter((sp) => !firestoreProjects.some((fp) => fp.id === sp.id)),
         ];
         localStorage.setItem('rupt_projects', JSON.stringify(merged));
@@ -994,7 +1005,10 @@ function AppContent() {
     
     // Determine if current project is shared
     const currentProject = projects.find(p => p.id === activeProjectId);
-    const isSharedProject = currentProject && currentProject.members && currentProject.members.length > 0;
+    const isSharedProject = currentProject && activeProjectId !== 'default' && (
+      currentProject.adminId !== user?.uid ||  // user is a member (joined, not the owner)
+      (currentProject.members && currentProject.members.length > 0)  // user is admin, has members
+    );
     
     console.log('syncToFirestore - activeProjectId:', activeProjectId, 'isSharedProject:', isSharedProject, 'currentProject:', currentProject);
     
