@@ -431,6 +431,33 @@ function AppContent() {
         }
 
         isHydratingRef.current = false;
+
+        // Background: sync current user's display name into their shared projects (fixes stale/missing names)
+        if (currentUser.displayName) {
+          const userName = currentUser.displayName;
+          const userEmailLower = currentUser.email?.toLowerCase();
+          allProjects
+            .filter(p => p.id !== 'default' && p.adminId !== 'local_user')
+            .forEach(async (project) => {
+              try {
+                let changed = false;
+                const updated = { ...project };
+                if (project.adminEmail?.toLowerCase() === userEmailLower && project.adminName !== userName) {
+                  updated.adminName = userName;
+                  changed = true;
+                }
+                const memberIdx = (project.members || []).findIndex(m => m.email?.toLowerCase() === userEmailLower);
+                if (memberIdx >= 0 && project.members[memberIdx].name !== userName) {
+                  updated.members = [...project.members];
+                  updated.members[memberIdx] = { ...project.members[memberIdx], name: userName };
+                  changed = true;
+                }
+                if (changed) await saveSharedProject(updated);
+              } catch (e) {
+                console.error('Failed to sync user name in shared project:', e);
+              }
+            });
+        }
       }
     });
 
@@ -1028,6 +1055,7 @@ function AppContent() {
       members: [],
       adminId: user?.uid || 'local_user',
       adminEmail: user?.email || 'Anonymous',
+      adminName: user?.displayName || user?.email?.split('@')[0] || '',
     };
     const updatedProjects = [...projects, newProject];
     setProjects(updatedProjects);
@@ -1043,6 +1071,30 @@ function AppContent() {
         activeProjectId: newProject.id,
       });
     }
+  };
+
+  const handleNameUpdate = async (newName) => {
+    if (!user || !newName) return;
+    const userEmailLower = user.email?.toLowerCase();
+    const updatedProjects = projects.map(project => {
+      if (project.id === 'default' || project.adminId === 'local_user') return project;
+      let updated = { ...project };
+      if (project.adminEmail?.toLowerCase() === userEmailLower) {
+        updated = { ...updated, adminName: newName };
+      }
+      const memberIdx = (project.members || []).findIndex(m => m.email?.toLowerCase() === userEmailLower);
+      if (memberIdx >= 0) {
+        const newMembers = [...project.members];
+        newMembers[memberIdx] = { ...newMembers[memberIdx], name: newName };
+        updated = { ...updated, members: newMembers };
+      }
+      return updated;
+    });
+    setProjects(updatedProjects);
+    localStorage.setItem('rupt_projects', JSON.stringify(updatedProjects));
+    updatedProjects
+      .filter(p => p.id !== 'default' && p.adminId !== 'local_user')
+      .forEach(project => saveSharedProject(project).catch(console.error));
   };
 
   const handleOpenProjectSettings = async (projectId) => {
@@ -2072,6 +2124,7 @@ function AppContent() {
         user={user}
         userPhoto={userPhoto}
         onClose={() => setIsProfileModalOpen(false)}
+        onNameUpdate={handleNameUpdate}
       />
     </div>
   );

@@ -39,13 +39,21 @@ function TaskItem({
     const list = [];
     if (currentProject.adminEmail) {
       seen.add(currentProject.adminEmail.toLowerCase());
+      const isMe = currentProject.adminEmail.toLowerCase() === currentUserEmail?.toLowerCase();
       const adminMember = currentProject.members?.find(m => m.email?.toLowerCase() === currentProject.adminEmail.toLowerCase());
-      list.push({ email: currentProject.adminEmail, name: adminMember?.name || currentProject.adminEmail.split('@')[0] });
+      const name = isMe
+        ? (currentUserDisplayName || adminMember?.name || currentProject.adminEmail.split('@')[0])
+        : (currentProject.adminName || adminMember?.name || currentProject.adminEmail.split('@')[0]);
+      list.push({ email: currentProject.adminEmail, name });
     }
     (currentProject.members || []).forEach(m => {
       if (m.email && !seen.has(m.email.toLowerCase())) {
         seen.add(m.email.toLowerCase());
-        list.push({ email: m.email, name: m.name || m.email.split('@')[0] });
+        const isMe = m.email.toLowerCase() === currentUserEmail?.toLowerCase();
+        const name = isMe
+          ? (currentUserDisplayName || m.name || m.email.split('@')[0])
+          : (m.name || m.email.split('@')[0]);
+        list.push({ email: m.email, name });
       }
     });
     return list;

@@ -171,13 +171,21 @@ function TaskDetailModal({ task, isRunning, elapsedSeconds, onClose, onUpdateTas
             const participants = [];
             if (currentProject?.adminEmail) {
               seen.add(currentProject.adminEmail.toLowerCase());
+              const isMe = currentProject.adminEmail.toLowerCase() === currentUserEmail?.toLowerCase();
               const adminMember = currentProject.members?.find(m => m.email?.toLowerCase() === currentProject.adminEmail.toLowerCase());
-              participants.push({ email: currentProject.adminEmail, name: adminMember?.name || currentProject.adminEmail.split('@')[0] });
+              const name = isMe
+                ? (currentUserDisplayName || adminMember?.name || currentProject.adminEmail.split('@')[0])
+                : (currentProject.adminName || adminMember?.name || currentProject.adminEmail.split('@')[0]);
+              participants.push({ email: currentProject.adminEmail, name });
             }
             (currentProject?.members || []).forEach(m => {
               if (m.email && !seen.has(m.email.toLowerCase())) {
                 seen.add(m.email.toLowerCase());
-                participants.push({ email: m.email, name: m.name || m.email.split('@')[0] });
+                const isMe = m.email.toLowerCase() === currentUserEmail?.toLowerCase();
+                const name = isMe
+                  ? (currentUserDisplayName || m.name || m.email.split('@')[0])
+                  : (m.name || m.email.split('@')[0]);
+                participants.push({ email: m.email, name });
               }
             });
             if (participants.length === 0) return null;
@@ -190,11 +198,7 @@ function TaskDetailModal({ task, isRunning, elapsedSeconds, onClose, onUpdateTas
                   onChange={(e) => onUpdateTask(task.id, 'assignedTo', e.target.value)}
                 >
                   {participants.map((p) => (
-                    <option key={p.email} value={p.email}>
-                      {p.email.toLowerCase() === currentUserEmail?.toLowerCase()
-                        ? (currentUserDisplayName || p.name)
-                        : p.name}
-                    </option>
+                    <option key={p.email} value={p.email}>{p.name}</option>
                   ))}
                 </select>
               </div>

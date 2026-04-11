@@ -5,7 +5,7 @@ import { saveUserData, loadUserData } from '../utils/firestore';
 import { CloseIcon } from './Icons';
 import '../styles/UserProfileModal.css';
 
-function UserProfileModal({ isOpen, onClose, user, userPhoto }) {
+function UserProfileModal({ isOpen, onClose, user, userPhoto, onNameUpdate }) {
   const [displayName, setDisplayName] = useState(user?.displayName || '');
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -95,6 +95,7 @@ function UserProfileModal({ isOpen, onClose, user, userPhoto }) {
       });
 
       setSuccess('Perfil atualizado com sucesso!');
+      onNameUpdate?.(displayName.trim());
       setTimeout(() => {
         resetMessages();
         window.location.reload(); // Reload to refresh photo
