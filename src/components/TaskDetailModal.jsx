@@ -166,23 +166,40 @@ function TaskDetailModal({ task, isRunning, elapsedSeconds, onClose, onUpdateTas
           </div>
 
           {/* Responsável (só em projetos compartilhados) */}
-          {!isDefaultProject && (
-            <div className="task-detail-field">
-              <label>Responsável</label>
-              <select
-                className="task-detail-select"
-                value={task.assignedTo || currentUserEmail}
-                onChange={(e) => onUpdateTask(task.id, 'assignedTo', e.target.value)}
-              >
-                <option value={currentUserEmail}>{currentUserDisplayName || currentUserEmail?.split('@')[0]}</option>
-                {currentProject?.members?.filter(m => m.email !== currentUserEmail).map((member) => (
-                  <option key={member.email} value={member.email}>
-                    {member.name || member.email?.split('@')[0]}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
+          {!isDefaultProject && (() => {
+            const seen = new Set();
+            const participants = [];
+            if (currentProject?.adminEmail) {
+              seen.add(currentProject.adminEmail.toLowerCase());
+              const adminMember = currentProject.members?.find(m => m.email?.toLowerCase() === currentProject.adminEmail.toLowerCase());
+              participants.push({ email: currentProject.adminEmail, name: adminMember?.name || currentProject.adminEmail.split('@')[0] });
+            }
+            (currentProject?.members || []).forEach(m => {
+              if (m.email && !seen.has(m.email.toLowerCase())) {
+                seen.add(m.email.toLowerCase());
+                participants.push({ email: m.email, name: m.name || m.email.split('@')[0] });
+              }
+            });
+            if (participants.length === 0) return null;
+            return (
+              <div className="task-detail-field">
+                <label>Responsável</label>
+                <select
+                  className="task-detail-select"
+                  value={task.assignedTo || currentUserEmail}
+                  onChange={(e) => onUpdateTask(task.id, 'assignedTo', e.target.value)}
+                >
+                  {participants.map((p) => (
+                    <option key={p.email} value={p.email}>
+                      {p.email.toLowerCase() === currentUserEmail?.toLowerCase()
+                        ? (currentUserDisplayName || p.name)
+                        : p.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            );
+          })()}
 
           {/* Tempo */}
           <div className="task-detail-field">
