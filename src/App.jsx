@@ -671,6 +671,10 @@ function AppContent() {
     description,
     kanbanStages,
   }) => {
+    // Skip all updates while initial data hydration is in progress
+    if (isHydratingRef.current) return;
+
+    // Always keep project metadata up to date (members, settings, etc.)
     setProjects((prevProjects) => {
       const updated = prevProjects.map((p) =>
         p.id === projectId
@@ -690,6 +694,12 @@ function AppContent() {
       localStorage.setItem('rupt_projects', JSON.stringify(updated));
       return updated;
     });
+
+    // If we have a pending local write, our state is AHEAD of Firestore.
+    // Skip overwriting local tasks — the deferred sync will write the correct
+    // state to Firestore, and the NEXT listener fire will confirm it.
+    if (tasksSyncPendingRef.current) return;
+
     const uniqueSharedTasks = deduplicateTasks(sharedTasks);
     setTasks((prevTasks) => {
       const otherTasks = prevTasks.filter((t) => t.projectId !== projectId);
@@ -723,8 +733,10 @@ function AppContent() {
   };
 
   // ── Personal user listener (one per login session) ────────────────────────
+  // Start as soon as auth is ready. The callback itself guards against hydration
+  // (handleUserTasksUpdateRef checks isHydratingRef internally).
   useEffect(() => {
-    if (!user || authLoading || isHydratingRef.current) return;
+    if (!user || authLoading) return;
     const unsub = onUserTasksChange(user.uid, (data) => handleUserTasksUpdateRef.current(data));
     unsubscribeUserTasksRef.current = unsub;
     return () => {
@@ -737,8 +749,9 @@ function AppContent() {
   // Adds/removes listeners as the projects list changes. Existing listeners are
   // reused (not torn down) when unrelated projects change, so members always
   // receive real-time updates regardless of which project is currently active.
+  // Callbacks guard against hydration (handleSharedProjectUpdateRef checks internally).
   useEffect(() => {
-    if (!user || authLoading || isHydratingRef.current) return;
+    if (!user || authLoading) return;
 
     const sharedProjects = projects.filter(
       (p) => p.id !== 'default' && (p.members?.length > 0 || p.inviteEnabled === true)
@@ -1355,17 +1368,13 @@ function AppContent() {
   };
 
   const toggleUrgent = (taskId) => {
-    setTasks((prevTasks) =>
-      prevTasks.map((task) =>
-        task.id === taskId
-          ? { 
-              ...task, 
-              isUrgent: !task.isUrgent,
-              // Urgent tasks will automatically position below running due to status sorting
-            }
-          : task
-      )
-    );
+    setTasks((prevTasks) => {
+      const updated = prevTasks.map((task) =>
+        task.id === taskId ? { ...task, isUrgent: !task.isUrgent } : task
+      );
+      tasksSyncPendingRef.current = true;
+      return updated;
+    });
   };
 
   const updateTask = (taskId, field, value) => {
