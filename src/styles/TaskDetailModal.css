@@ -354,6 +354,42 @@
   font-size: 0.82rem;
 }
 
+.task-attachment-upload-area {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  border: 1.5px dashed rgba(255,255,255,0.15);
+  border-radius: 8px;
+  padding: 0.55rem 0.9rem;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+  user-select: none;
+}
+
+.task-attachment-upload-area:hover {
+  border-color: var(--projectColor, #4adeb9);
+  background: rgba(255,255,255,0.03);
+}
+
+.task-attachment-area-icon {
+  width: 15px;
+  height: 15px;
+  color: var(--projectColor, #4adeb9);
+  flex-shrink: 0;
+}
+
+.task-attachment-area-text {
+  font-size: 0.82rem;
+  color: #ccc;
+  white-space: nowrap;
+}
+
+.task-attachment-area-hint {
+  font-size: 0.75rem;
+  color: #666;
+  white-space: nowrap;
+}
+
 .task-attachment-progress {
   display: flex;
   align-items: center;

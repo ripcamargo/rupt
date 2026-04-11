@@ -18,6 +18,21 @@ function TaskDetailModal({ task, isRunning, elapsedSeconds, onClose, onUpdateTas
   const [links, setLinks] = useState([]);
   const [newLinkUrl, setNewLinkUrl] = useState('');
   const fileInputRef = useRef(null);
+  const processFileRef = useRef(null);
+
+  // Paste listener – uses ref so it never needs to be re-registered
+  useEffect(() => {
+    const handleGlobalPaste = (e) => {
+      const items = Array.from(e.clipboardData?.items || []);
+      const fileItem = items.find((item) => item.kind === 'file');
+      if (!fileItem) return;
+      e.preventDefault();
+      const file = fileItem.getAsFile();
+      if (file) processFileRef.current?.(file);
+    };
+    document.addEventListener('paste', handleGlobalPaste);
+    return () => document.removeEventListener('paste', handleGlobalPaste);
+  }, []);
 
   useEffect(() => {
     if (!task) return;
@@ -62,10 +77,8 @@ function TaskDetailModal({ task, isRunning, elapsedSeconds, onClose, onUpdateTas
     if (e.key === 'Escape') onClose();
   };
 
-  const handleFileChange = async (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    e.target.value = '';
+  const processFile = async (file) => {
+    if (uploading) return;
     setUploadError('');
     setUploading(true);
     setUploadProgress(0);
@@ -80,6 +93,14 @@ function TaskDetailModal({ task, isRunning, elapsedSeconds, onClose, onUpdateTas
       setUploading(false);
       setUploadProgress(0);
     }
+  };
+  processFileRef.current = processFile;
+
+  const handleFileChange = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    e.target.value = '';
+    processFile(file);
   };
 
   const handleAddLink = () => {
@@ -292,13 +313,14 @@ function TaskDetailModal({ task, isRunning, elapsedSeconds, onClose, onUpdateTas
                 <span>{uploadProgress}%</span>
               </div>
             ) : (
-              <>
-                <button
-                  className="task-detail-btn-ghost task-attachment-upload-btn"
-                  onClick={() => fileInputRef.current?.click()}
-                >
-                  + Adicionar anexo
-                </button>
+              <div className="task-attachment-upload-area" onClick={() => fileInputRef.current?.click()}>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="task-attachment-area-icon">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                  <polyline points="17 8 12 3 7 8"/>
+                  <line x1="12" y1="3" x2="12" y2="15"/>
+                </svg>
+                <span className="task-attachment-area-text">Clique para selecionar</span>
+                <span className="task-attachment-area-hint">ou cole com Ctrl+V</span>
                 <input
                   ref={fileInputRef}
                   type="file"
@@ -306,7 +328,7 @@ function TaskDetailModal({ task, isRunning, elapsedSeconds, onClose, onUpdateTas
                   style={{ display: 'none' }}
                   onChange={handleFileChange}
                 />
-              </>
+              </div>
             )}
             {uploadError && <span className="task-attachment-error">{uploadError}</span>}
           </div>
