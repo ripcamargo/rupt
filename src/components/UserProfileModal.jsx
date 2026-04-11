@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { updateProfile, updatePassword, reauthenticateWithCredential, EmailAuthProvider } from 'firebase/auth';
+import { updateProfile, updatePassword, reauthenticateWithCredential, EmailAuthProvider, deleteUser } from 'firebase/auth';
 import { auth } from '../utils/firebase';
 import { saveUserData, loadUserData } from '../utils/firestore';
 import { CloseIcon } from './Icons';
@@ -14,6 +14,11 @@ function UserProfileModal({ isOpen, onClose, user, userPhoto }) {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showDeleteZone, setShowDeleteZone] = useState(false);
+  const [deleteConfirmEmail, setDeleteConfirmEmail] = useState('');
+  const [deletePassword, setDeletePassword] = useState('');
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
 
   useEffect(() => {
     setPhotoBase64(userPhoto || '');
@@ -153,6 +158,31 @@ function UserProfileModal({ isOpen, onClose, user, userPhoto }) {
     }
   };
 
+  const handleDeleteAccount = async () => {
+    if (deleteConfirmEmail.trim().toLowerCase() !== user.email.toLowerCase()) {
+      setDeleteError('Email não confere com o da conta.');
+      return;
+    }
+    setIsDeleting(true);
+    setDeleteError('');
+    try {
+      // Re-authenticate first (required by Firebase before sensitive ops)
+      const credential = EmailAuthProvider.credential(user.email, deletePassword);
+      await reauthenticateWithCredential(user, credential);
+      // Wipe Firestore user data, then delete Firebase Auth account
+      await saveUserData(user.uid, { tasks: [], settings: null, projects: [], photoURL: null });
+      await deleteUser(user);
+      // Auth state change listener in App.jsx will handle cleanup + navigate
+    } catch (err) {
+      if (err?.code === 'auth/wrong-password' || err?.code === 'auth/invalid-credential') {
+        setDeleteError('Senha incorreta.');
+      } else {
+        setDeleteError(err?.message || 'Erro ao excluir conta.');
+      }
+      setIsDeleting(false);
+    }
+  };
+
   return (
     <div className="profile-modal-overlay" onClick={handleClose}>
       <div className="profile-modal" onClick={(e) => e.stopPropagation()}>
@@ -255,6 +285,43 @@ function UserProfileModal({ isOpen, onClose, user, userPhoto }) {
           <button className="profile-signout" onClick={handleSignOut}>
             Sair da conta
           </button>
+
+          <button
+            className="profile-delete-toggle"
+            onClick={() => { setShowDeleteZone((v) => !v); setDeleteError(''); setDeleteConfirmEmail(''); setDeletePassword(''); }}
+          >
+            {showDeleteZone ? 'Cancelar exclusão' : 'Excluir conta'}
+          </button>
+
+          {showDeleteZone && (
+            <div className="profile-delete-zone">
+              <p className="profile-delete-warning">
+                Esta ação é <strong>irreversível</strong>. Todos os seus dados serão apagados permanentemente.
+              </p>
+              <input
+                className="profile-delete-input"
+                type="email"
+                placeholder={`Digite seu email (${user.email}) para confirmar`}
+                value={deleteConfirmEmail}
+                onChange={(e) => setDeleteConfirmEmail(e.target.value)}
+              />
+              <input
+                className="profile-delete-input"
+                type="password"
+                placeholder="Sua senha atual"
+                value={deletePassword}
+                onChange={(e) => setDeletePassword(e.target.value)}
+              />
+              {deleteError && <p className="profile-error">{deleteError}</p>}
+              <button
+                className="profile-delete-confirm"
+                onClick={handleDeleteAccount}
+                disabled={isDeleting || !deleteConfirmEmail || !deletePassword}
+              >
+                {isDeleting ? 'Excluindo...' : 'Confirmar exclusão de conta'}
+              </button>
+            </div>
+          )}
         </div>
       </div>
     </div>

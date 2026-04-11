@@ -213,6 +213,80 @@
   background: rgba(255, 107, 107, 0.1);
 }
 
+.profile-delete-toggle {
+  width: 100%;
+  margin-top: 0.5rem;
+  padding: 0;
+  background: transparent;
+  border: none;
+  color: #555;
+  font-size: 0.75rem;
+  cursor: pointer;
+  text-align: center;
+  text-decoration: underline;
+  transition: color 0.2s ease;
+}
+
+.profile-delete-toggle:hover {
+  color: #ff6b6b;
+}
+
+.profile-delete-zone {
+  margin-top: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.profile-delete-warning {
+  font-size: 0.8rem;
+  color: #ff9f9f;
+  margin: 0;
+  line-height: 1.4;
+}
+
+.profile-delete-input {
+  padding: 0.65rem 0.8rem;
+  border-radius: 8px;
+  border: 1px solid #3a2020;
+  background: #1b1209;
+  color: #f2f2f2;
+  font-family: inherit;
+  font-size: 0.85rem;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.profile-delete-input:focus {
+  outline: none;
+  border-color: #ff6b6b;
+  box-shadow: 0 0 0 3px rgba(255, 107, 107, 0.15);
+}
+
+.profile-delete-confirm {
+  width: 100%;
+  padding: 0.7rem;
+  background: transparent;
+  border: 1px solid #ff6b6b;
+  color: #ff6b6b;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 0.82rem;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  transition: all 0.2s ease;
+}
+
+.profile-delete-confirm:hover:not(:disabled) {
+  background: rgba(255, 107, 107, 0.15);
+}
+
+.profile-delete-confirm:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
 @media (max-height: 600px) {
   .profile-modal {
     max-height: 95vh;
