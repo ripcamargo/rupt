@@ -1102,12 +1102,13 @@ function AppContent() {
     setIsProjectSettingsOpen(true);
     setSelectedProjectForSettings(localProject); // show immediately with local data
 
-    // For shared/invite projects, fetch fresh member list from Firestore
-    const isShared = localProject && (localProject.members?.length > 0 || localProject.inviteEnabled);
-    if (isShared && localProject.id !== 'default') {
+    // Always fetch fresh data from Firestore for non-default projects
+    // (members may have joined from other devices and local state may be stale)
+    if (localProject && localProject.id !== 'default') {
       const freshData = await loadSharedProject(projectId);
       if (freshData) {
-        const merged = { ...localProject, members: freshData.members || [], memberEmails: freshData.memberEmails || [] };
+        const merged = { ...localProject, ...freshData, members: freshData.members || localProject.members || [], memberEmails: freshData.memberEmails || localProject.memberEmails || [] };
+        setSelectedProjectForSettings(merged);
         setProjects(prev =>
           prev.map(p => p.id === projectId ? merged : p)
         );
