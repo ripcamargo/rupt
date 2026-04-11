@@ -32,6 +32,32 @@ function TaskItem({
   const [editingField, setEditingField] = useState(null);
   const [editValue, setEditValue] = useState('');
 
+  // All project participants: admin first, then other members, deduped by email
+  const allParticipants = (() => {
+    if (!currentProject || isDefaultProject) return [];
+    const seen = new Set();
+    const list = [];
+    if (currentProject.adminEmail) {
+      seen.add(currentProject.adminEmail.toLowerCase());
+      const adminMember = currentProject.members?.find(m => m.email?.toLowerCase() === currentProject.adminEmail.toLowerCase());
+      list.push({ email: currentProject.adminEmail, name: adminMember?.name || currentProject.adminEmail.split('@')[0] });
+    }
+    (currentProject.members || []).forEach(m => {
+      if (m.email && !seen.has(m.email.toLowerCase())) {
+        seen.add(m.email.toLowerCase());
+        list.push({ email: m.email, name: m.name || m.email.split('@')[0] });
+      }
+    });
+    return list;
+  })();
+
+  const getDisplayName = (email) => {
+    if (!email) return currentUserDisplayName || currentUserEmail?.split('@')[0];
+    if (email.toLowerCase() === currentUserEmail?.toLowerCase()) return currentUserDisplayName || currentUserEmail.split('@')[0];
+    const p = allParticipants.find(m => m.email.toLowerCase() === email.toLowerCase());
+    return p?.name || email.split('@')[0];
+  };
+
   const totalSeconds = task.totalDurationSeconds + (isRunning ? elapsedSeconds : 0);
 
   const startTime = new Date(task.startedAt).toLocaleTimeString('pt-BR', {
@@ -194,14 +220,21 @@ function TaskItem({
 
             {/* 4. Responsável e Tempo lado a lado */}
             <div className="task-time-row">
-              {!isDefaultProject && (
+              {!isDefaultProject && allParticipants.length > 0 && (
+                <select
+                  className="task-assignee-inline-select"
+                  value={task.assignedTo || currentUserEmail}
+                  onChange={(e) => onUpdateTask(task.id, 'assignedTo', e.target.value)}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  {allParticipants.map((p) => (
+                    <option key={p.email} value={p.email}>{getDisplayName(p.email)}</option>
+                  ))}
+                </select>
+              )}
+              {!isDefaultProject && allParticipants.length === 0 && (
                 <span className="task-assignee-inline">
-                  {(() => {
-                    const assignedEmail = task.assignedTo || currentUserEmail;
-                    if (assignedEmail === currentUserEmail) return currentUserDisplayName || currentUserEmail?.split('@')[0];
-                    const member = currentProject?.members?.find(m => m.email === assignedEmail);
-                    return member?.name || assignedEmail?.split('@')[0];
-                  })()}
+                  {getDisplayName(task.assignedTo || currentUserEmail)}
                 </span>
               )}
               <div 
@@ -299,8 +332,7 @@ function TaskItem({
                 )}
                 {!isDefaultProject && (
                   <span 
-                    className={`task-assigned-to ${isEditMode ? 'editable' : ''}`}
-                    onDoubleClick={() => handleDoubleClick('assignedTo', task.assignedTo || currentUserEmail)}
+                    className="task-assigned-to"
                   >
                     {editingField === 'assignedTo' ? (
                       <select
@@ -311,22 +343,22 @@ function TaskItem({
                         autoFocus
                         className="task-edit-select"
                       >
-                        <option value={currentUserEmail}>{currentUserDisplayName || currentUserEmail?.split('@')[0]}</option>
-                        {currentProject?.members?.filter(m => m.email !== currentUserEmail).map((member) => (
-                          <option key={member.email} value={member.email}>
-                            {member.name || member.email?.split('@')[0]}
-                          </option>
+                        {allParticipants.map((p) => (
+                          <option key={p.email} value={p.email}>{getDisplayName(p.email)}</option>
                         ))}
                       </select>
                     ) : (
-                      <span className="assigned-to-name">
-                        {(() => {
-                          const assignedEmail = task.assignedTo || currentUserEmail;
-                          if (assignedEmail === currentUserEmail) return `Responsável: ${currentUserDisplayName || currentUserEmail?.split('@')[0]}`;
-                          const member = currentProject?.members?.find(m => m.email === assignedEmail);
-                          return `Responsável: ${member?.name || assignedEmail?.split('@')[0]}`;
-                        })()}
-                      </span>
+                      <select
+                        className="task-assignee-select"
+                        value={task.assignedTo || currentUserEmail}
+                        onChange={(e) => onUpdateTask(task.id, 'assignedTo', e.target.value)}
+                        onClick={(e) => e.stopPropagation()}
+                        title="Atribuir responsável"
+                      >
+                        {allParticipants.map((p) => (
+                          <option key={p.email} value={p.email}>{getDisplayName(p.email)}</option>
+                        ))}
+                      </select>
                     )}
                   </span>
                 )}

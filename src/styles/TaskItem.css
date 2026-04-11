@@ -240,20 +240,37 @@
   margin-left: 1rem;
 }
 
-.task-assigned-to.editable {
-  cursor: text;
-}
-
-.task-assigned-to.editable:hover {
-  background-color: rgba(74, 222, 185, 0.05);
-  border-radius: 4px;
-  padding: 2px 4px;
-  margin: -2px -4px;
-}
-
-.assigned-to-name {
+.task-assignee-select,
+.task-assignee-inline-select {
+  background: transparent;
+  border: none;
   color: #7acd7a;
   font-weight: 500;
+  font-size: 0.85rem;
+  font-family: inherit;
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: 4px;
+  outline: none;
+  appearance: none;
+  -webkit-appearance: none;
+  /* show a subtle chevron */
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%237acd7a'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 2px center;
+  padding-right: 14px;
+  transition: background-color 0.15s;
+}
+
+.task-assignee-select:hover,
+.task-assignee-inline-select:hover {
+  background-color: rgba(122, 205, 122, 0.08);
+}
+
+.task-assignee-select option,
+.task-assignee-inline-select option {
+  background: #1b1b1b;
+  color: #e0e0e0;
 }
 
 .task-edit-select {
@@ -649,6 +666,12 @@
   text-overflow: ellipsis;
   white-space: nowrap;
   max-width: 50%;
+}
+
+.task-item.kanban-view .task-assignee-inline-select {
+  max-width: 50%;
+  color: #999;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23999'/%3E%3C/svg%3E");
 }
 
 .task-item.kanban-view .task-time {
