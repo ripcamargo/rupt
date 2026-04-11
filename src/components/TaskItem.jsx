@@ -226,46 +226,54 @@ function TaskItem({
               </div>
             )}
 
-            {/* 4. Responsável e Tempo lado a lado */}
-            <div className="task-time-row">
-              {!isDefaultProject && allParticipants.length > 0 && (
-                <select
-                  className="task-assignee-inline-select"
-                  value={task.assignedTo || currentUserEmail}
-                  onChange={(e) => onUpdateTask(task.id, 'assignedTo', e.target.value)}
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  {allParticipants.map((p) => (
-                    <option key={p.email} value={p.email}>{getDisplayName(p.email)}</option>
-                  ))}
-                </select>
-              )}
-              {!isDefaultProject && allParticipants.length === 0 && (
-                <span className="task-assignee-inline">
-                  {getDisplayName(task.assignedTo || currentUserEmail)}
-                </span>
-              )}
-              <div 
-                className={`task-time ${isEditMode ? 'editable' : ''}`}
-                onDoubleClick={() => handleDoubleClick('time', task.totalDurationSeconds)}
-                title={isEditMode ? 'Clique duas vezes para editar (formato: HH:mm:ss)' : ''}
-              >
-                {editingField === 'time' ? (
-                  <input
-                    type="text"
-                    value={editValue}
-                    onChange={(e) => setEditValue(e.target.value)}
-                    onBlur={handleEditBlur}
-                    onKeyDown={handleEditKeyDown}
-                    autoFocus
-                    className="task-edit-input time-input"
-                    placeholder="HH:mm:ss"
-                  />
-                ) : (
-                  <>Tempo: {formatDuration(totalSeconds)}</>
-                )}
-              </div>
-            </div>
+            {/* 4. Responsável e Tempo */}
+            {(() => {
+              const assignee = task.assignedTo || currentUserEmail;
+              const isAssignee = assignee?.toLowerCase() === currentUserEmail?.toLowerCase();
+              return (
+                <div className="task-time-row">
+                  {!isDefaultProject && allParticipants.length > 0 && (
+                    <select
+                      className="task-assignee-inline-select"
+                      value={assignee}
+                      onChange={(e) => onUpdateTask(task.id, 'assignedTo', e.target.value)}
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      {allParticipants.map((p) => (
+                        <option key={p.email} value={p.email}>{getDisplayName(p.email)}</option>
+                      ))}
+                    </select>
+                  )}
+                  {!isDefaultProject && allParticipants.length === 0 && (
+                    <span className="task-assignee-inline">
+                      {getDisplayName(assignee)}
+                    </span>
+                  )}
+                  {isAssignee && (
+                    <div
+                      className={`task-time ${isEditMode ? 'editable' : ''}`}
+                      onDoubleClick={() => handleDoubleClick('time', task.totalDurationSeconds)}
+                      title={isEditMode ? 'Clique duas vezes para editar (formato: HH:mm:ss)' : ''}
+                    >
+                      {editingField === 'time' ? (
+                        <input
+                          type="text"
+                          value={editValue}
+                          onChange={(e) => setEditValue(e.target.value)}
+                          onBlur={handleEditBlur}
+                          onKeyDown={handleEditKeyDown}
+                          autoFocus
+                          className="task-edit-input time-input"
+                          placeholder="HH:mm:ss"
+                        />
+                      ) : (
+                        <>Tempo: {formatDuration(totalSeconds)}</>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
           </>
         ) : (
           // Default layout: horizontal
